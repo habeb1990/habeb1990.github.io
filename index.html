@@ -2496,11 +2496,13 @@
             if (!PRODUCTS.some(p => p.category === 'software')) {
               const swDefaults = DEFAULT_PRODUCTS.filter(p => p.category === 'software');
               PRODUCTS = [...PRODUCTS.slice(0, 3), ...swDefaults, ...PRODUCTS.slice(3)];
-              localStorage.setItem('habib_custom_products', JSON.stringify(PRODUCTS));
             }
+            PRODUCTS = PRODUCTS.map(p => sanitizeProductImages(p));
+            localStorage.setItem('habib_custom_products', JSON.stringify(PRODUCTS));
           }
         }
       }
+      PRODUCTS = PRODUCTS.map(p => sanitizeProductImages(p));
     } catch(e) {}
 
     let currentCategory = 'all';
@@ -2732,7 +2734,7 @@
           <div>
             <!-- Image Frame -->
             <div class="relative h-48 w-full overflow-hidden bg-slate-950/60 p-2">
-              <img src="${p.image}" alt="${p.title}" class="w-full h-full object-cover rounded-xl group-hover:scale-105 transition-transform duration-500">
+              <img src="${p.image || ASSETS.laptop}" onerror="handleImageRenderError(this, ${p.id}, 0)" alt="${p.title}" class="w-full h-full object-cover rounded-xl group-hover:scale-105 transition-transform duration-500">
               
               <!-- Multi-angle Badge (Top-Right) -->
               <span class="absolute top-3 right-3 px-2.5 py-1 rounded-xl bg-[#080c14]/90 text-amber-300 text-[10px] font-bold border border-amber-500/40 flex items-center gap-1 shadow-md">
@@ -2967,7 +2969,75 @@
 
     
     // --- AUTOMATIC DEVICE IMAGE UPLOAD TO WEBSITE & DIRECT WEB URL GENERATOR (رفع الصور للموقع وتوليد رابط ويب عالمي يفتح على جميع المتصفحات) ---
-    function optimizeImageFileToJpegDataUrl(file, maxDim = 1200, quality = 0.85) {
+    function isBrokenImageUrl(url) {
+      if (!url || typeof url !== 'string') return true;
+      const t = url.trim();
+      if (!t || t === 'null' || t === 'undefined' || t === '[object Object]') return true;
+      if (t.startsWith('blob:')) return true;
+      if (t.startsWith('data:image/') && t.length < 60) return true;
+      return false;
+    }
+
+    function getFallbackImageForProduct(p) {
+      if (p && p.category === 'software') return ASSETS.software_adobe;
+      if (p && p.category === 'accessories') return ASSETS.logitech_mx || ASSETS.gaming;
+      if (p && p.category === 'phones') return ASSETS.iphone_16 || ASSETS.phone;
+      return ASSETS.dell_xps || ASSETS.laptop;
+    }
+
+    function sanitizeProductImages(p) {
+      const fb = getFallbackImageForProduct(p);
+      if (isBrokenImageUrl(p.image)) {
+        p.image = fb;
+      } else {
+        p.image = hydrateImageRef(p.image);
+      }
+      if (!Array.isArray(p.montageImages) || p.montageImages.length === 0) {
+        p.montageImages = [p.image];
+      } else {
+        p.montageImages = p.montageImages
+          .map(m => hydrateImageRef(m))
+          .filter(m => !isBrokenImageUrl(m));
+        if (p.montageImages.length === 0) {
+          p.montageImages = [p.image];
+        }
+      }
+      if (isBrokenImageUrl(p.image) && p.montageImages.length > 0) {
+        p.image = p.montageImages[0];
+      }
+      return p;
+    }
+
+    function handleImageRenderError(imgEl, prodId, imgIdx) {
+      if (!imgEl) return;
+      // Avoid infinite error loop
+      if (imgEl.dataset.fallbackApplied === '1') return;
+      imgEl.dataset.fallbackApplied = '1';
+      let fb = ASSETS.laptop;
+      if (prodId) {
+        const p = PRODUCTS.find(item => item.id === prodId);
+        if (p) fb = getFallbackImageForProduct(p);
+      }
+      imgEl.src = fb;
+    }
+
+    function resetCorruptedProductPhotos(prodId) {
+      const p = PRODUCTS.find(item => item.id === prodId);
+      if (!p) return;
+      const defProd = DEFAULT_PRODUCTS.find(d => d.id === prodId);
+      const fb = defProd ? defProd.image : getFallbackImageForProduct(p);
+      p.image = fb;
+      p.montageImages = defProd && Array.isArray(defProd.montageImages) ? [...defProd.montageImages] : [fb];
+      try {
+        localStorage.setItem('habib_custom_products', JSON.stringify(PRODUCTS));
+      } catch(e) {}
+      autoSyncCloudMutation();
+      showToast("تم إصلاح واستعادة صور المنتج بنجاح! ✨📸");
+      openModal(prodId);
+      renderProducts();
+    }
+
+    function optimizeImageFileToJpegDataUrl(file, maxDim = 900, quality = 0.78) {
       return new Promise((resolve) => {
         const reader = new FileReader();
         reader.onerror = () => resolve(null);
@@ -3034,9 +3104,20 @@
               })
             });
             if (putRes.ok) {
-              // Return direct global CDN/raw web URL that opens immediately on all browsers worldwide
+              // Use the relative GitHub Pages path or verified DataURL so it displays 100% immediately even before raw CDN propagation
               const webUrl = `https://raw.githubusercontent.com/${githubRepo}/main/${repoPath}`;
-              return webUrl;
+              // Preload check: if raw.githubusercontent is accessible and ready, return webUrl; otherwise return optimizedDataUrl which works everywhere immediately
+              try {
+                const checkImg = await new Promise((res) => {
+                  const testImg = new Image();
+                  const timer = setTimeout(() => res(false), 2500);
+                  testImg.onload = () => { clearTimeout(timer); res(true); };
+                  testImg.onerror = () => { clearTimeout(timer); res(false); };
+                  testImg.src = webUrl + "?t=" + Date.now();
+                });
+                if (checkImg) return webUrl;
+              } catch (e) {}
+              return optimizedDataUrl;
             }
           }
         } catch (err) {}
@@ -3164,9 +3245,22 @@
       event.target.value = '';
 
       showToast(`جاري رفع ${files.length} صور للموقع وتوليد روابط ويب... ☁️⏳`);
+      const uploadedUrls = [];
       for (let i = 0; i < files.length; i++) {
         const webUrl = await uploadDeviceImageToWebUrl(files[i]);
-        p.montageImages.push(webUrl);
+        if (webUrl) uploadedUrls.push(webUrl);
+      }
+      if (uploadedUrls.length > 0) {
+        // Clean out any broken image entries and set the new uploaded photo as the primary cover if the current cover is broken or default
+        p.montageImages = p.montageImages.filter(m => !isBrokenImageUrl(m));
+        uploadedUrls.forEach(u => p.montageImages.push(u));
+        if (isBrokenImageUrl(p.image) || p.montageImages.length === uploadedUrls.length) {
+          p.image = uploadedUrls[0];
+        } else {
+          p.image = uploadedUrls[0];
+          // Move newly uploaded first photo to index 0 so it immediately appears in the main 360 viewport
+          p.montageImages = [uploadedUrls[0], ...p.montageImages.filter(u => u !== uploadedUrls[0])];
+        }
       }
       try {
         localStorage.setItem('habib_custom_products', JSON.stringify(PRODUCTS));
@@ -3279,9 +3373,20 @@
       renderProducts();
     }
 
-    function selectMontageModalPhoto(imgUrl, idx) {
+    function selectMontageModalPhoto(prodIdOrUrl, idx) {
       const mainImg = document.getElementById('modalAngleMainImage');
-      if (mainImg) mainImg.src = imgUrl;
+      let imgUrl = prodIdOrUrl;
+      if (typeof prodIdOrUrl === 'number') {
+        const p = PRODUCTS.find(item => item.id === prodIdOrUrl);
+        if (p) {
+          const list = (p.montageImages && p.montageImages.length > 0) ? p.montageImages : [p.image];
+          imgUrl = list[idx] || p.image || getFallbackImageForProduct(p);
+        }
+      }
+      if (mainImg && imgUrl) {
+        delete mainImg.dataset.fallbackApplied;
+        mainImg.src = imgUrl;
+      }
       const degDisp = document.getElementById('orbitDegDisplay');
       if (degDisp) degDisp.textContent = `صورة ${idx + 1}`;
       const thumbs = document.querySelectorAll('.montage-modal-thumb');
@@ -3926,7 +4031,7 @@
             </div>
 
             <div id="modalAngleViewport" class="w-full h-full overflow-hidden rounded-2xl flex items-center justify-center bg-black/40 pointer-events-none">
-              <img id="modalAngleMainImage" src="${p.image || ASSETS.laptop}" alt="${p.title}" class="w-full h-full object-contain transition-transform duration-75">
+              <img id="modalAngleMainImage" src="${p.image || ASSETS.laptop}" onerror="handleImageRenderError(this, ${p.id}, 0)" alt="${p.title}" class="w-full h-full object-contain transition-transform duration-75">
             </div>
 
             <!-- Live Angle HUD / Description Badge -->
@@ -3989,8 +4094,8 @@
             <div class="flex items-center gap-2.5 overflow-x-auto pb-2 scrollbar-thin">
               ${((p.montageImages && p.montageImages.length > 0) ? p.montageImages : [p.image]).map((img, idx) => `
                 <div class="relative flex-shrink-0 group/thumb">
-                  <div onclick="selectMontageModalPhoto('${img}', ${idx})" class="montage-modal-thumb w-14 h-14 rounded-xl overflow-hidden border-2 cursor-pointer transition-all ${idx === 0 ? 'border-amber-400 scale-105 ring-2 ring-amber-400/40' : 'border-slate-800 hover:border-slate-600'}" title="عرض الصورة ${idx + 1}">
-                    <img src="${img}" class="w-full h-full object-cover">
+                  <div onclick="selectMontageModalPhoto(${p.id}, ${idx})" class="montage-modal-thumb w-14 h-14 rounded-xl overflow-hidden border-2 cursor-pointer transition-all ${idx === 0 ? 'border-amber-400 scale-105 ring-2 ring-amber-400/40' : 'border-slate-800 hover:border-slate-600'}" title="عرض الصورة ${idx + 1}">
+                    <img src="${img}" onerror="handleImageRenderError(this, ${p.id}, ${idx})" class="w-full h-full object-cover">
                   </div>
                   ${isAdminLoggedIn ? `
                     <!-- Quick Admin Badge Controls on Thumbnail -->
@@ -4033,6 +4138,10 @@
                     <span>تعديل / استبدال صورة الغلاف</span>
                   </button>
                 </div>
+                <button type="button" onclick="resetCorruptedProductPhotos(${p.id})" class="w-full py-2 px-3 rounded-xl bg-rose-950/60 hover:bg-rose-900/80 text-rose-200 border border-rose-500/30 font-bold text-[11px] flex items-center justify-center gap-1.5 transition-all">
+                  <i class="fa-solid fa-wand-magic-sparkles text-amber-400"></i>
+                  <span>إصلاح ومسح الصور التالفة لهذا المنتج فوراً</span>
+                </button>
 
                 <!-- Add by URL Input -->
                 <div class="flex gap-2">
@@ -4052,7 +4161,7 @@
                     ${((p.montageImages && p.montageImages.length > 0) ? p.montageImages : [p.image]).map((img, idx) => `
                       <div class="flex items-center justify-between p-2 rounded-xl bg-slate-900/90 border border-slate-800 text-xs gap-2">
                         <div class="flex items-center gap-2.5 overflow-hidden">
-                          <img src="${img}" class="w-10 h-10 rounded-lg object-cover flex-shrink-0 border border-slate-700">
+                          <img src="${img}" onerror="handleImageRenderError(this, ${p.id}, ${idx})" class="w-10 h-10 rounded-lg object-cover flex-shrink-0 border border-slate-700">
                           <div class="text-[11px] truncate">
                             <span class="font-bold text-white">صورة ${idx + 1}</span>
                             ${idx === 0 ? '<span class="mr-1.5 text-[9px] px-2 py-0.5 rounded bg-amber-500 text-slate-950 font-bold">الغلاف الرئيسي للمنتج</span>' : ''}
@@ -4872,7 +4981,7 @@
         if (Array.isArray(p.montageImages)) {
           copy.montageImages = p.montageImages.map(m => compressImageRef(m));
         }
-        return copy;
+        return sanitizeProductImages(copy);
       });
     }
 
