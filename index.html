@@ -814,6 +814,9 @@
       <button onclick="openTopBarEditModal()" class="bg-slate-950 text-amber-300 px-3 py-1 rounded-lg text-xs font-black hover:bg-slate-900 transition-colors flex items-center gap-1 shadow-sm" title="التحكم وتعديل نصوص الشريط العلوي واسم المتجر">
         <i class="fa-solid fa-pen-to-square text-amber-400"></i> تعديل الشريط العلوي
       </button>
+      <button onclick="resetAllCorruptedStorePhotos()" class="bg-rose-950 text-amber-300 border border-amber-400/60 px-3 py-1 rounded-lg text-xs font-black hover:bg-rose-900 transition-colors flex items-center gap-1 shadow-sm" title="مسح وإصلاح أي صور تالفة أو مربعات فارغة في جميع منتجات المتجر فوراً">
+        <i class="fa-solid fa-wand-magic-sparkles text-amber-400"></i> مسح وإصلاح الصور التالفة ✨
+      </button>
       <button onclick="openAddProductPage()" class="bg-slate-950 text-amber-300 px-3 py-1 rounded-lg text-xs font-black hover:bg-slate-900 transition-colors flex items-center gap-1 shadow-sm">
         <i class="fa-solid fa-plus-circle text-amber-400"></i> + إضافة منتج
       </button>
@@ -1209,6 +1212,9 @@
               <input type="file" id="pageMontageFiles" multiple accept="image/*" onchange="handlePageMontageFiles(event)" class="hidden">
               <button type="button" onclick="document.getElementById('pageMontageFiles').click()" class="py-2.5 px-4 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs flex items-center gap-2 shadow transition-all">
                 <i class="fa-solid fa-images"></i> + اختيار صور كثيرة للمونتاج من جهازك
+              </button>
+              <button type="button" onclick="resetCurrentEditingPagePhotos()" class="py-2.5 px-4 rounded-xl bg-rose-950/80 hover:bg-rose-900 text-amber-300 border border-rose-500/40 font-bold text-xs flex items-center gap-2 shadow transition-all">
+                <i class="fa-solid fa-wand-magic-sparkles text-amber-400"></i> مسح وإصلاح الصور التالفة لهذا المنتج ✨
               </button>
             </div>
             <div class="flex gap-2">
@@ -3080,6 +3086,63 @@
       imgEl.src = fb;
     }
 
+    function resetAllCorruptedStorePhotos() {
+      if (!isAdminLoggedIn) {
+        showToast("إصلاح الصور مخصص للمشرف فقط 🔒");
+        toggleAdminPrompt();
+        return;
+      }
+      PRODUCTS = PRODUCTS.map(p => {
+        const defP = getDefaultProductById(p.id);
+        const fb = defP ? defP.image : getFallbackImageForProduct(p);
+        // Clean out any broken or external raw.githubusercontent URLs
+        if (!p.image || isBrokenImageUrl(p.image) || p.image.includes('raw.githubusercontent.com') || p.image.includes('/uploads/')) {
+          p.image = fb;
+        }
+        if (Array.isArray(p.montageImages)) {
+          const validM = p.montageImages.filter(m => m && !isBrokenImageUrl(m) && !m.includes('raw.githubusercontent.com') && !m.includes('/uploads/'));
+          p.montageImages = validM.length > 0 ? validM : (defP && Array.isArray(defP.montageImages) ? [...defP.montageImages] : [p.image]);
+        } else {
+          p.montageImages = defP && Array.isArray(defP.montageImages) ? [...defP.montageImages] : [p.image];
+        }
+        return sanitizeProductImages(p);
+      });
+      try {
+        localStorage.setItem('habib_custom_products', JSON.stringify(PRODUCTS));
+      } catch(e) {}
+      renderHeroSlider();
+      renderProducts();
+      autoSyncCloudMutation();
+      showToast("تم مسح وإصلاح جميع الصور التالفة في المتجر واستعادة صور الغلاف بنجاح! ✨📸");
+    }
+
+    function resetCurrentEditingPagePhotos() {
+      const idVal = document.getElementById('pageProdId') ? document.getElementById('pageProdId').value : 'new';
+      let fb = ASSETS.dell_xps || ASSETS.laptop;
+      let defMontage = [fb];
+      if (idVal && idVal !== 'new') {
+        const prodId = parseInt(idVal, 10);
+        const defP = getDefaultProductById(prodId);
+        const p = PRODUCTS.find(item => item.id === prodId);
+        fb = defP ? defP.image : (p ? getFallbackImageForProduct(p) : fb);
+        defMontage = defP && Array.isArray(defP.montageImages) ? [...defP.montageImages] : [fb];
+        if (p) {
+          p.image = fb;
+          p.montageImages = [...defMontage];
+          try {
+            localStorage.setItem('habib_custom_products', JSON.stringify(PRODUCTS));
+          } catch(e) {}
+        }
+      }
+      const pageImgInput = document.getElementById('pageImage');
+      if (pageImgInput) pageImgInput.value = fb;
+      currentProductMontageImages = [...defMontage];
+      renderPageMontageThumbnails();
+      updateLiveCard();
+      autoSyncCloudMutation();
+      showToast("تم مسح الصور التالفة واستعادة صورة الغلاف الأصلية لهذا المنتج! ✨📸");
+    }
+
     function resetCorruptedProductPhotos(prodId) {
       const p = PRODUCTS.find(item => item.id === prodId);
       if (!p) return;
@@ -4126,9 +4189,15 @@
                 <i class="fa-solid fa-photo-film text-amber-400"></i>
                 <span>معرض صور وفيديوهات المنتج والمونتاج (صور متعددة 📸):</span>
               </span>
-              <span class="text-[10px] px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-mono font-bold border border-amber-500/30">
-                ${(p.montageImages && p.montageImages.length) || 1} صور متوفرة
-              </span>
+              <div class="flex items-center gap-1.5">
+                <button type="button" onclick="resetCorruptedProductPhotos(${p.id})" class="text-[10px] px-2.5 py-1 rounded-full bg-rose-950/90 hover:bg-rose-800 text-amber-300 font-bold border border-amber-500/40 flex items-center gap-1 shadow transition-all" title="اضغط هنا لإصلاح ومسح الصور التالفة واستعادة صورة الغلاف فوراً">
+                  <i class="fa-solid fa-wand-magic-sparkles text-amber-400"></i>
+                  <span>مسح وإصلاح الصور التالفة ✨</span>
+                </button>
+                <span class="text-[10px] px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-mono font-bold border border-amber-500/30">
+                  ${(p.montageImages && p.montageImages.length) || 1} صور متوفرة
+                </span>
+              </div>
             </div>
 
             <!-- Horizontal Thumbnails Strip -->
