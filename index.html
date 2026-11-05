@@ -755,6 +755,7 @@
       border: 1px solid rgba(203, 213, 225, 0.8) !important;
     }
 </style>
+  <script id="embeddedStoreState" type="application/json">{}</script>
 </head>
 <body class="bg-[#080c14] text-slate-100 min-h-screen flex flex-col selection:bg-brand-maroon selection:text-white">
   <!-- MOBILE BOTTOM STICKY NAVIGATION BAR (شريط الإبهام السفلي الذكي للجوال) -->
@@ -799,9 +800,14 @@
             <button onclick="openCloudSyncModal()" class="bg-slate-950 text-cyan-300 border border-cyan-400/50 px-3 py-1 rounded-lg text-xs font-black hover:bg-slate-900 transition-colors flex items-center gap-1 shadow-sm" title="إعدادات الحفظ السحابي وقاعدة البيانات">
         <i class="fa-solid fa-cloud text-cyan-400"></i> الحفظ السحابي (Cloud Sync)
       </button>
-      <button onclick="exportUpdatedStoreFile()" class="bg-slate-950 text-emerald-300 border border-emerald-400/50 px-3 py-1 rounded-lg text-xs font-black hover:bg-slate-900 transition-colors flex items-center gap-1 shadow-sm" title="تصدير وتحميل ملف المتجر المحدث كاملاً">
+      <button onclick="exportUpdatedStoreFile()" class="bg-slate-950 text-emerald-300 border border-emerald-400/50 px-3 py-1 rounded-lg text-xs font-black hover:bg-slate-900 transition-colors flex items-center gap-1 shadow-sm" title="حفظ التعديلات فقط في ملف خفيف (habib_updates.html) بدون تكرار الأيقونات والستايلات الثابتة ورفعه لـ GitHub">
         <i class="fa-solid fa-download text-emerald-400"></i> تصدير ملف المتجر المحدث
       </button>
+      <input type="file" id="importStoreHtmlInput" accept=".html,.htm" onchange="handleImportStoreHtmlFile(event)" class="hidden">
+      <button type="button" onclick="triggerImportStoreHtml()" class="bg-slate-950 text-sky-300 border border-sky-400/60 px-3 py-1 rounded-lg text-xs font-black hover:bg-slate-900 transition-colors flex items-center gap-1 shadow-sm" title="خاص بالمشرف فقط: استيراد ملف HTML المعدل وأخذ نسخة خفيفة للتعديلات ونشرها فوراً على المتجر وعلى GitHub">
+        <i class="fa-solid fa-file-import text-sky-400"></i> استيراد ملف HTML ونشر التعديلات
+      </button>
+      <span id="importStatusBanner" class="hidden px-2.5 py-1 rounded-lg text-[11px] font-black shadow-sm items-center gap-1"></span>
       <button onclick="openTickerEditModal()" class="bg-slate-950 text-amber-300 px-3 py-1 rounded-lg text-xs font-black hover:bg-slate-900 transition-colors flex items-center gap-1 shadow-sm" title="التحكم وتعديل شريط الأخبار المباشر وكتابة جمل من عندك">
         <i class="fa-solid fa-bullhorn text-amber-400"></i> تعديل شريط الأخبار
       </button>
@@ -824,7 +830,7 @@
         
         <!-- LOGO & BRAND (ENLARGED) -->
         <div class="flex items-center gap-2">
-          <a href="#home" onclick="incrementVisitorsByFive(false)" class="flex items-center gap-3 sm:gap-4 group">
+          <a href="#home" onclick="handleVisitorCounterClick()" class="flex items-center gap-3 sm:gap-4 group">
             <div class="w-14 h-14 sm:w-16 sm:h-16 rounded-full p-1 bg-gradient-to-tr from-amber-500 via-[#7e122b] to-cyan-400 shadow-xl group-hover:scale-105 transition-transform flex-shrink-0">
               <img data-asset="logo" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1 1'%3E%3C/svg%3E" alt="شعار حبيب ديزاينر - مركز الحبيب" class="w-full h-full object-cover rounded-full bg-slate-950">
             </div>
@@ -846,13 +852,13 @@
         <div class="flex items-center gap-2 topbar-scroll flex-nowrap py-1 overflow-x-auto max-w-[310px] xs:max-w-[360px] sm:max-w-md md:max-w-2xl lg:max-w-none" id="topNavScrollContainer">
           
           
-          <!-- 0. VISITOR COUNTER WIDGET (عداد الزوار التلقائي النظيف بدون كلمة +5) -->
-          <div id="visitorsCounterBtn" onclick="handleVisitorCounterClick()" class="flex-shrink-0 px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-2 transition-all shadow-md hover:scale-105 active:scale-95 border cursor-pointer relative" title="عدد الزوار يزداد تلقائياً بمقدار 5 زوار مع كل زيارة أو نقرة">
+          <!-- 0. VISITOR COUNTER WIDGET (يزيد +2 تلقائياً عند كل دخول، والضغط للزيادة خاص بالمشرف فقط) -->
+          <div id="visitorsCounterBtn" onclick="handleVisitorCounterClick()" class="flex-shrink-0 px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-2 transition-all shadow-md border cursor-default relative select-none" title="عدد الزوار المباشر لمتجر مركز الحبيب">
             <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
             <i class="fa-solid fa-users text-cyan-300 text-xs"></i>
             <span class="font-tajawal text-[11px] sm:text-xs font-black flex items-center gap-1.5">
               <span class="text-slate-200">عدد الزوار:</span>
-              <span id="visitorsCountDisplay" class="text-amber-400 font-mono font-black text-xs sm:text-sm">5 زوار</span>
+              <span id="visitorsCountDisplay" class="text-amber-400 font-mono font-black text-xs sm:text-sm">زائرين (2)</span>
             </span>
           </div>
 
@@ -1006,20 +1012,25 @@
 
       <!-- FILTER BUTTONS -->
       <div class="flex items-center justify-center gap-2 overflow-x-auto pb-1" id="categoryButtons">
-        <button onclick="filterCategory('laptops')" class="cat-btn px-4 py-1.5 rounded-xl text-xs font-bold transition-all bg-slate-900 text-slate-300 hover:bg-slate-800 border border-slate-800 whitespace-nowrap">
+        <button onclick="filterCategory('laptops')" class="cat-btn px-4 py-1.5 rounded-xl text-xs font-bold transition-all bg-slate-900 text-slate-300 whitespace-nowrap">
           لابتوبات (<span id="count-laptops">0</span>)
         </button>
 
-        <button onclick="filterCategory('accessories')" class="cat-btn px-4 py-1.5 rounded-xl text-xs font-bold transition-all bg-slate-900 text-slate-300 hover:bg-slate-800 border border-slate-800 whitespace-nowrap">
+        <button onclick="filterCategory('software')" class="cat-btn px-4 py-1.5 rounded-xl text-xs font-bold transition-all bg-slate-900 text-slate-300 whitespace-nowrap flex items-center gap-1">
+          <i class="fa-solid fa-screwdriver-wrench text-cyan-400 text-[11px]"></i>
+          <span>البرامج والصيانة (<span id="count-software">0</span>)</span>
+        </button>
+
+        <button onclick="filterCategory('accessories')" class="cat-btn px-4 py-1.5 rounded-xl text-xs font-bold transition-all bg-slate-900 text-slate-300 whitespace-nowrap">
           إكسسوارات (<span id="count-accessories">0</span>)
         </button>
 
-        <button onclick="filterCategory('phones')" class="cat-btn px-4 py-1.5 rounded-xl text-xs font-bold transition-all bg-slate-900 text-slate-300 hover:bg-slate-800 border border-slate-800 whitespace-nowrap">
+        <button onclick="filterCategory('phones')" class="cat-btn px-4 py-1.5 rounded-xl text-xs font-bold transition-all bg-slate-900 text-slate-300 whitespace-nowrap">
           جوالات (<span id="count-phones">0</span>)
         </button>
 
         <!-- زر المزيد في نهاية السياق (يعرض جميع الأجهزة والمنتجات) -->
-        <button onclick="filterCategory('more')" class="cat-btn active px-4 py-1.5 rounded-xl text-xs font-bold transition-all btn-maroon whitespace-nowrap shadow-md">
+        <button onclick="filterCategory('more')" class="cat-btn active px-4 py-1.5 rounded-xl text-xs font-bold transition-all btn-maroon whitespace-nowrap flex items-center gap-1">
           المزيد ✨ (<span id="count-more">0</span>)
         </button>
       </div>
@@ -1108,7 +1119,8 @@
               <label class="block text-xs font-bold text-slate-300 mb-1.5">القسم / التصنيف:</label>
               <select id="pageCategory" onchange="updateLiveCard()" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-amber-400">
                 <option value="laptops">لابتوبات</option>
-                <option value="accessories">إكسسوارات</option>
+                <option value="software">البرامج والصيانة 🛠️</option>
+                <option value="accessories">إكسسوارات وماوسات</option>
                 <option value="phones">جوالات</option>
               </select>
             </div>
@@ -1153,13 +1165,31 @@
               <select onchange="applyPagePresetImage(this.value)" class="bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-xs text-slate-200 focus:outline-none">
                 <option value="">نماذج صور جاهزة</option>
                 <option value="laptop">لابتوب</option>
+                <option value="software">برامج وصيانة 🛠️</option>
                 <option value="mouse">إكسسوار</option>
                 <option value="phone">جوال</option>
               </select>
             </div>
 
-            <div>
-              <input type="text" id="pageImage" oninput="updateLiveCard()" placeholder="أو الصق رابط صورة خارجية مباشرة..." class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-slate-300 font-mono focus:outline-none focus:border-amber-400">
+            <div class="space-y-2">
+              <div class="flex items-center justify-between">
+                <span class="text-[11px] font-bold text-cyan-300 flex items-center gap-1">
+                  <i class="fa-solid fa-globe text-cyan-400"></i>
+                  <span>رابط الويب المباشر للصورة (يفتح على جميع المتصفحات):</span>
+                </span>
+                <span id="pageImageUploadBadge" class="hidden text-[10px] px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 font-bold">تم رفع الصورة وتوليد رابط ويب 🌐</span>
+              </div>
+              <div class="flex items-center gap-1.5">
+                <input type="text" id="pageImage" oninput="updateLiveCard()" placeholder="رابط الويب المباشر للصورة (https://...) يظهر هنا تلقائياً فور رفعها من جهازك" class="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-cyan-300 font-mono focus:outline-none focus:border-cyan-400" dir="ltr">
+                <button type="button" onclick="copyImageWebUrlInput('pageImage')" class="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-300 border border-slate-700 text-xs font-bold flex items-center gap-1" title="نسخ رابط الويب للصورة">
+                  <i class="fa-solid fa-copy"></i>
+                  <span>نسخ الرابط</span>
+                </button>
+                <button type="button" onclick="openImageWebUrlInBrowser('pageImage')" class="px-3 py-2 rounded-xl bg-cyan-600/20 hover:bg-cyan-600/30 text-cyan-300 border border-cyan-500/40 text-xs font-bold flex items-center gap-1" title="فتح رابط الصورة في المتصفح">
+                  <i class="fa-solid fa-up-right-from-square"></i>
+                  <span>فتح بالمتصفح</span>
+                </button>
+              </div>
             </div>
           </div>
 
@@ -1284,7 +1314,7 @@
           <div class="flex items-center gap-2">
             <span id="cloudStatusDot" class="w-3 h-3 rounded-full bg-amber-400 animate-pulse"></span>
             <h3 class="text-base font-bold text-white flex items-center gap-1.5">
-              <span>إعدادات الحفظ والمزامنة السحابية (Firebase Cloud)</span>
+              <span>الحفظ السحابي المباشر (GitHub & JSONBin - بدون سحابة غوغل)</span>
               <span id="cloudStatusBadge" class="text-[10px] px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 font-mono">محلي فقط</span>
             </h3>
           </div>
@@ -1294,7 +1324,7 @@
         </div>
 
         <p class="text-xs text-slate-300 leading-relaxed">
-          عند تفعيل الحفظ السحابي، أي تعديل تجريه على الصور، الأجهزة، أو شريط الأخبار من هاتفك سيظهر <strong>فوراً في نفس اللحظة أمام جميع الزوار حول العالم</strong> دون الحاجة لإعادة رفع أي ملفات.
+          صُمم هذا النظام ليعمل <strong>بدون سحابة غوغل</strong>؛ بحيث يتحدث متجرك تلقائياً أمام جميع الزوار عبر <strong>GitHub مباشرة</strong> أو عبر سحابة <strong>JSONBin.io / Supabase</strong> دون الحاجة لإعادة رفع ملف المتجر يدوياً.
         </p>
 
         <!-- Current Status & Quick Sync -->
@@ -1319,15 +1349,36 @@
           </div>
         </div>
 
-        <!-- Firebase URL Configuration Form -->
+        <!-- Option 1: Direct GitHub Cloud Sync (No Google Cloud Needed) -->
+        <div class="p-3.5 rounded-2xl bg-slate-950/90 border border-emerald-500/40 space-y-2.5">
+          <div class="flex items-center justify-between">
+            <label class="block text-xs font-bold text-emerald-300">
+              <i class="fa-brands fa-github text-emerald-400 text-sm"></i> الخيار 1: التحديث التلقائي المباشر عبر GitHub (بدون إعادة رفع الملف)
+            </label>
+            <span class="text-[10px] px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold">يعمل في سوريا 100%</span>
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <div>
+              <span class="block text-[10px] text-slate-400 mb-1">اسم المستودع (Repository):</span>
+              <input type="text" id="githubRepoInput" value="habeb1990/habeb-centr" placeholder="habeb1990/habeb-centr" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-emerald-400" dir="ltr">
+            </div>
+            <div>
+              <span class="block text-[10px] text-slate-400 mb-1">مفتاح GitHub Token (للمشرف فقط):</span>
+              <input type="password" id="githubTokenInput" placeholder="ghp_xxxxxxxxxxxx" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-emerald-400" dir="ltr">
+            </div>
+          </div>
+          <p class="text-[10px] text-slate-400 leading-relaxed">
+            عند وضع مفتاح GitHub Token مرة واحدة هنا، سيقوم المتجر تلقائياً بحفظ تعديلاتك وصورك في ملف <code>store_data.json</code> داخل مستودعك <code>habeb1990/habeb-centr</code> بدون أن ترفع أي ملف يدوياً!
+          </p>
+        </div>
+
+        <!-- Option 2: External Non-Google Cloud URL (JSONBin.io / Supabase / REST) -->
         <div class="p-3.5 rounded-2xl bg-slate-950/80 border border-slate-800 space-y-2.5">
           <label class="block text-xs font-bold text-amber-300">
-            <i class="fa-solid fa-link text-amber-400"></i> رابط قاعدة بيانات Firebase Realtime Database:
+            <i class="fa-solid fa-link text-amber-400"></i> الخيار 2: رابط سحابة خارجية مستقلة (JSONBin.io أو Supabase):
           </label>
-          <input type="text" id="firebaseDbUrlInput" placeholder="مثال: https://alhabib-center-default-rtdb.firebaseio.com" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-white font-mono focus:outline-none focus:border-cyan-400" dir="ltr">
-          <p class="text-[10px] text-slate-400 leading-relaxed">
-            ضع رابط قاعدة بيانات Firebase المجانية الخاصة بك هنا ليتم الربط التلقائي الفوري لكافة الأجهزة.
-          </p>
+          <input type="text" id="firebaseDbUrlInput" placeholder="مثال: https://api.jsonbin.io/v3/b/YOUR_BIN_ID" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-white font-mono focus:outline-none focus:border-cyan-400" dir="ltr">
+          <input type="password" id="cloudApiKeyInput" placeholder="مفتاح السحابة الاختياري (X-Master-Key في JSONBin أو apikey في Supabase)" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-white font-mono focus:outline-none focus:border-cyan-400" dir="ltr">
           <div class="flex gap-2 pt-1">
             <button type="button" onclick="saveCloudSettings()" class="flex-1 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs shadow transition-all">
               حفظ وتفعيل الرابط السحابي 💾
@@ -1338,30 +1389,41 @@
           </div>
         </div>
 
-        <!-- 3-Step Setup Guide -->
+        <!-- Easy Setup Guide Without Google -->
         <div class="p-3.5 rounded-2xl bg-cyan-950/20 border border-cyan-500/30 space-y-2 text-xs text-slate-300">
           <div class="font-bold text-cyan-300 flex items-center gap-1.5">
             <i class="fa-solid fa-circle-question text-cyan-400"></i>
-            <span>كيف تنشئ قاعدة بيانات مجانية على Google Firebase خلال دقيقتين؟</span>
+            <span>كيف تفعّل التحديث التلقائي عبر GitHub في دقيقة واحدة (بدون غوغل)؟</span>
           </div>
           <p class="text-[11px] text-slate-300 leading-relaxed">
-            1. افتح موقع <strong>Google Firebase</strong> (مجاني تماماً بحساب جوجل الخاص بك).<br>
-            2. اضغط <strong>Create a project</strong> وسمّه <code>alhabib-center</code>.<br>
-            3. من القائمة اختر <strong>Build</strong> ثم <strong>Realtime Database</strong>، واضغط <strong>Create Database</strong>.<br>
-            4. في خطوة القواعد (Rules)، اختر <strong>Start in test mode</strong> ليتمكن المتجر من القراءة والكتابة.<br>
-            5. انسخ الرابط الذي يظهر في الأعلى وضعه في المربع أعلاه واضغط حفظ. هكذا تصبح التعديلات حية عالمياً!
+            1. في حسابك على <strong>GitHub</strong>، افتح <strong>Settings</strong> ثم في آخر القائمة اليسرى اختر <strong>Developer settings</strong>.<br>
+            2. اختر <strong>Personal access tokens</strong> ثم <strong>Tokens (classic)</strong> واضغط <strong>Generate new token</strong>.<br>
+            3. ضع علامة صح أمام خيار <strong>repo</strong> واضغط <strong>Generate token</strong>.<br>
+            4. انسخ الرمز الذي يبدأ بـ <code>ghp_</code> وضعه في خانة <strong>مفتاح GitHub Token</strong> أعلاه واضغط <strong>حفظ وتفعيل</strong>. من هذه اللحظة أي تعديل تجريه من جوالك يُحدث موقعك عالمياً بضغطة واحدة!
           </p>
         </div>
 
-        <!-- Alternative: Download Updated Code -->
-        <div class="pt-2 border-t border-slate-800 flex items-center justify-between gap-3">
-          <button type="button" onclick="exportUpdatedStoreFile()" class="flex-1 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs flex items-center justify-center gap-1.5 shadow transition-all">
-            <i class="fa-solid fa-file-arrow-down text-sm"></i>
-            <span>أو تصدير ملف المتجر المحدث كاملاً (index.html) 📥</span>
-          </button>
-          <button type="button" onclick="closeCloudSyncModal()" class="px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-400 text-xs font-bold">
-            إغلاق
-          </button>
+        <!-- Direct Lightweight Delta Export, Import & Base File Controls (Admin Only) -->
+        <div class="pt-2 border-t border-slate-800 space-y-2">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <button type="button" onclick="exportUpdatedStoreFile()" class="py-2.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs flex items-center justify-center gap-1.5 shadow transition-all">
+              <i class="fa-solid fa-bolt text-sm"></i>
+              <span>تصدير ونشر ملف التعديلات الخفيف فقط (habib_updates.html) ⚡</span>
+            </button>
+            <button type="button" onclick="triggerImportStoreHtml()" class="py-2.5 px-3 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-black text-xs flex items-center justify-center gap-1.5 shadow transition-all">
+              <i class="fa-solid fa-file-import text-sm"></i>
+              <span>استيراد ملف HTML المعدل ونشره على المتجر 📂</span>
+            </button>
+          </div>
+          <div class="flex items-center justify-between gap-2 pt-1">
+            <button type="button" onclick="exportFullBaseStoreFile()" class="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] font-bold flex items-center gap-1.5">
+              <i class="fa-solid fa-file-code text-amber-400"></i>
+              <span>تنزيل الملف الأصلي الثابت كاملاً (index.html)</span>
+            </button>
+            <button type="button" onclick="closeCloudSyncModal()" class="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-400 text-xs font-bold">
+              إغلاق
+            </button>
+          </div>
         </div>
 
       </div>
@@ -1639,7 +1701,8 @@
               <label class="block text-xs font-bold text-slate-300 mb-1">القسم / التصنيف:</label>
               <select id="editCategory" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-400">
                 <option value="laptops">لابتوبات</option>
-                                <option value="accessories">إكسسوارات</option>
+                <option value="software">البرامج والصيانة 🛠️</option>
+                <option value="accessories">إكسسوارات وماوسات</option>
                 <option value="phones">جوالات</option>
               </select>
             </div>
@@ -1672,14 +1735,24 @@
               <select onchange="applyPresetImage(this.value)" class="bg-slate-900 border border-slate-700 rounded-xl px-2.5 py-2 text-xs text-slate-200 focus:outline-none">
                 <option value="">صور جاهزة</option>
                 <option value="laptop">لابتوب</option>
+                <option value="software">برامج وصيانة 🛠️</option>
                                 <option value="mouse">إكسسوار</option>
                 <option value="phone">جوال</option>
               </select>
             </div>
 
-            <!-- Image Link / Path Input -->
-            <div>
-              <input type="text" id="editImage" placeholder="أو الصق رابط صورة خارجية مباشرة..." class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-1.5 text-[11px] text-slate-300 font-mono focus:outline-none focus:border-amber-400">
+            <!-- Image Link / Path Input with Web URL Copy & Open -->
+            <div class="space-y-1.5">
+              <span class="block text-[10px] font-bold text-cyan-300">رابط الويب المباشر للصورة (يفتح على جميع المتصفحات):</span>
+              <div class="flex items-center gap-1.5">
+                <input type="text" id="editImage" required placeholder="رابط الويب المباشر للصورة (https://...)" class="flex-1 bg-slate-950 border border-slate-700 rounded-xl px-3 py-1.5 text-[11px] text-cyan-300 focus:outline-none focus:border-cyan-400 font-mono" dir="ltr">
+                <button type="button" onclick="copyImageWebUrlInput('editImage')" class="px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-300 border border-slate-700 text-[11px] font-bold" title="نسخ رابط الويب">
+                  <i class="fa-solid fa-copy"></i> نسخ
+                </button>
+                <button type="button" onclick="openImageWebUrlInBrowser('editImage')" class="px-2.5 py-1.5 rounded-xl bg-cyan-600/20 hover:bg-cyan-600/30 text-cyan-300 border border-cyan-500/40 text-[11px] font-bold" title="فتح في المتصفح">
+                  <i class="fa-solid fa-globe"></i> فتح
+                </button>
+              </div>
             </div>
 
             <!-- Live Image Preview Box -->
@@ -2243,6 +2316,9 @@
       aerox_3: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 600 450' width='100%25' height='100%25'%3E%3Cdefs%3E%3ClinearGradient id='bgAe' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%23130c1e'/%3E%3Cstop offset='100%25' stop-color='%2306030a'/%3E%3C/linearGradient%3E%3ClinearGradient id='prismRgb' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%23ec4899'/%3E%3Cstop offset='50%25' stop-color='%238b5cf6'/%3E%3Cstop offset='100%25' stop-color='%233b82f6'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='600' height='450' fill='url(%23bgAe)' rx='28'/%3E%3Cg transform='translate(150, 40)'%3E%3Cpath d='M 110 35 C 160 35 205 70 215 150 C 225 235 210 315 160 335 C 110 350 70 330 45 295 C 20 260 25 180 40 140 C 55 100 70 35 110 35 Z' fill='%230f172a' stroke='%23ec4899' stroke-width='2' filter='drop-shadow(0 20px 30px rgba(236,72,153,0.3))'/%3E%3Cg fill='none' stroke='url(%23prismRgb)' stroke-width='1.8'%3E%3Cpolygon points='110,180 125,188 125,204 110,212 95,204 95,188'/%3E%3Cpolygon points='145,180 160,188 160,204 145,212 130,204 130,188'/%3E%3Cpolygon points='75,180 90,188 90,204 75,212 60,204 60,188'/%3E%3Cpolygon points='127,215 142,223 142,239 127,247 112,239 112,223'/%3E%3Cpolygon points='93,215 108,223 108,239 93,247 78,239 78,223'/%3E%3C/g%3E%3Crect x='98' y='60' width='24' height='48' rx='6' fill='%231e293b' stroke='%23ec4899' stroke-width='1.5'/%3E%3Ctext x='110' y='380' fill='%23ec4899' font-family='sans-serif' font-size='14' font-weight='900' text-anchor='middle'%3ESTEELSERIES AEROX 3%3C/text%3E%3Ctext x='110' y='400' fill='%23cbd5e1' font-family='sans-serif' font-size='10' font-weight='bold' text-anchor='middle'%3EHoneycomb Shell • IP54 Water Resistant%3C/text%3E%3C/g%3E%3C/svg%3E",
       iphone_16: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 600 450' width='100%25' height='100%25'%3E%3Cdefs%3E%3ClinearGradient id='bgIp' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%23171310'/%3E%3Cstop offset='100%25' stop-color='%23080605'/%3E%3C/linearGradient%3E%3ClinearGradient id='desertTit' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%23d4a373'/%3E%3Cstop offset='50%25' stop-color='%23a98467'/%3E%3Cstop offset='100%25' stop-color='%236c584c'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='600' height='450' fill='url(%23bgIp)' rx='28'/%3E%3Cg transform='translate(180, 30)'%3E%3Crect x='20' y='10' width='200' height='370' rx='38' fill='url(%23desertTit)' stroke='%23e6ccb2' stroke-width='2' filter='drop-shadow(0 25px 40px rgba(0,0,0,0.85))'/%3E%3Crect x='26' y='16' width='188' height='358' rx='34' fill='%23000000'/%3E%3Crect x='28' y='18' width='184' height='354' rx='32' fill='%230f172a' opacity='0.9'/%3E%3Crect x='85' y='26' width='70' height='18' rx='9' fill='%23000000' stroke='%23334155' stroke-width='0.5'/%3E%3Ccircle cx='120' cy='200' r='55' fill='none' stroke='url(%23desertTit)' stroke-width='2' opacity='0.4'/%3E%3Ctext x='120' y='210' fill='%23ddb892' font-family='sans-serif' font-size='13' font-weight='900' text-anchor='middle'%3EiPHONE 16 PRO MAX%3C/text%3E%3Ctext x='120' y='230' fill='%23b08968' font-family='sans-serif' font-size='10' font-weight='bold' text-anchor='middle'%3EA18 Pro • Desert Titanium%3C/text%3E%3C/g%3E%3C/svg%3E",
       s24_ultra: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 600 450' width='100%25' height='100%25'%3E%3Cdefs%3E%3ClinearGradient id='bgS24' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%230b1329'/%3E%3Cstop offset='100%25' stop-color='%23020617'/%3E%3C/linearGradient%3E%3ClinearGradient id='titaniumGray' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%2394a3b8'/%3E%3Cstop offset='50%25' stop-color='%2364748b'/%3E%3Cstop offset='100%25' stop-color='%23334155'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='600' height='450' fill='url(%23bgS24)' rx='28'/%3E%3Cg transform='translate(170, 30)'%3E%3Crect x='20' y='10' width='210' height='370' rx='8' fill='url(%23titaniumGray)' stroke='%2338bdf8' stroke-width='1.8' filter='drop-shadow(0 25px 40px rgba(0,0,0,0.85))'/%3E%3Crect x='25' y='15' width='200' height='360' rx='6' fill='%23020617'/%3E%3Crect x='28' y='18' width='194' height='354' rx='4' fill='%230f172a'/%3E%3Ccircle cx='125' cy='30' r='5' fill='%23000000' stroke='%231e293b' stroke-width='1'/%3E%3Crect x='245' y='80' width='8' height='260' rx='4' fill='url(%23titaniumGray)' stroke='%2338bdf8' stroke-width='1'/%3E%3Ctext x='125' y='210' fill='%2338bdf8' font-family='sans-serif' font-size='13' font-weight='900' text-anchor='middle'%3ES24 ULTRA • GALAXY AI%3C/text%3E%3Ctext x='125' y='230' fill='%2394a3b8' font-family='sans-serif' font-size='10' font-weight='bold' text-anchor='middle'%3E200MP • Built-in S-Pen%3C/text%3E%3C/g%3E%3C/svg%3E",
+      software_adobe: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 600 450' width='100%25' height='100%25'%3E%3Cdefs%3E%3ClinearGradient id='bgSw1' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0%25' stop-color='%23090d16'/%3E%3Cstop offset='50%25' stop-color='%231e1b4b'/%3E%3Cstop offset='100%25' stop-color='%233b0764'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='600' height='450' fill='url(%23bgSw1)'/%3E%3Ccircle cx='480' cy='90' r='110' fill='%2300f0ff' opacity='0.12'/%3E%3Ccircle cx='120' cy='360' r='130' fill='%23f43f5e' opacity='0.15'/%3E%3Crect x='90' y='70' width='420' height='260' rx='22' fill='%230f172a' stroke='%2338bdf8' stroke-width='3'/%3E%3Crect x='115' y='95' width='110' height='100' rx='16' fill='%23311042' stroke='%23f472b6' stroke-width='2'/%3E%3Ctext x='170' y='158' font-family='Arial,sans-serif' font-size='44' font-weight='900' fill='%23f472b6' text-anchor='middle'%3EPr%3C/text%3E%3Crect x='245' y='95' width='110' height='100' rx='16' fill='%230c2d48' stroke='%2338bdf8' stroke-width='2'/%3E%3Ctext x='300' y='158' font-family='Arial,sans-serif' font-size='44' font-weight='900' fill='%2338bdf8' text-anchor='middle'%3EPs%3C/text%3E%3Crect x='375' y='95' width='110' height='100' rx='16' fill='%231e1b4b' stroke='%23a78bfa' stroke-width='2'/%3E%3Ctext x='430' y='158' font-family='Arial,sans-serif' font-size='44' font-weight='900' fill='%23a78bfa' text-anchor='middle'%3EAe%3C/text%3E%3Crect x='115' y='215' width='370' height='85' rx='14' fill='%231e293b' stroke='%23fbbf24' stroke-width='2'/%3E%3Ctext x='300' y='252' font-family='Cairo,Arial,sans-serif' font-size='22' font-weight='bold' fill='%23fbbf24' text-anchor='middle'%3EAdobe CC 2026 %26 AutoCAD / 3ds Max%3C/text%3E%3Ctext x='300' y='282' font-family='Cairo,Arial,sans-serif' font-size='16' fill='%23e2e8f0' text-anchor='middle'%3Eتنصيب وتفعيل كامل مع ضبط كرت الشاشة للمونتاج%3C/text%3E%3Ctext x='300' y='390' font-family='Cairo,Arial,sans-serif' font-size='26' font-weight='900' fill='%23ffffff' text-anchor='middle'%3Eمركز الحبيب - قسم البرامج الهندسية والمونتاج%3C/text%3E%3C/svg%3E",
+      software_maint: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 600 450' width='100%25' height='100%25'%3E%3Cdefs%3E%3ClinearGradient id='bgSw2' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0%25' stop-color='%23080c14'/%3E%3Cstop offset='50%25' stop-color='%23064e3b'/%3E%3Cstop offset='100%25' stop-color='%230f172a'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='600' height='450' fill='url(%23bgSw2)'/%3E%3Crect x='85' y='65' width='430' height='265' rx='22' fill='%230f172a' stroke='%2310b981' stroke-width='3'/%3E%3Crect x='115' y='95' width='175' height='110' rx='14' fill='%23065f46' stroke='%2334d399' stroke-width='2'/%3E%3Ctext x='202' y='145' font-family='Arial,sans-serif' font-size='28' font-weight='900' fill='%236ee7b7' text-anchor='middle'%3ENVMe SSD%3C/text%3E%3Ctext x='202' y='180' font-family='Arial,sans-serif' font-size='18' font-weight='bold' fill='%23ffffff' text-anchor='middle'%3E+ DDR5 RAM%3C/text%3E%3Crect x='310' y='95' width='175' height='110' rx='14' fill='%231e293b' stroke='%23fbbf24' stroke-width='2'/%3E%3Ctext x='397' y='145' font-family='Arial,sans-serif' font-size='26' font-weight='900' fill='%23fbbf24' text-anchor='middle'%3EARCTIC MX-6%3C/text%3E%3Ctext x='397' y='180' font-family='Cairo,Arial,sans-serif' font-size='17' font-weight='bold' fill='%23e2e8f0' text-anchor='middle'%3Eتبريد وصيانة احترافية%3C/text%3E%3Crect x='115' y='225' width='370' height='75' rx='14' fill='%23111827' stroke='%2338bdf8' stroke-width='2'/%3E%3Ctext x='300' y='268' font-family='Cairo,Arial,sans-serif' font-size='21' font-weight='bold' fill='%2338bdf8' text-anchor='middle'%3Eفحص حراري شامل وترقية سرعة اللابتوب 100%25%3C/text%3E%3Ctext x='300' y='390' font-family='Cairo,Arial,sans-serif' font-size='26' font-weight='900' fill='%23ffffff' text-anchor='middle'%3Eمركز الحبيب - صيانة وترقية الأجهزة بحمص%3C/text%3E%3C/svg%3E",
+      software_win11: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 600 450' width='100%25' height='100%25'%3E%3Cdefs%3E%3ClinearGradient id='bgSw3' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0%25' stop-color='%23080c14'/%3E%3Cstop offset='50%25' stop-color='%230c4a6e'/%3E%3Cstop offset='100%25' stop-color='%231e1b4b'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='600' height='450' fill='url(%23bgSw3)'/%3E%3Crect x='90' y='65' width='420' height='265' rx='22' fill='%230f172a' stroke='%2338bdf8' stroke-width='3'/%3E%3Crect x='235' y='95' width='60' height='60' rx='6' fill='%2300a4ef'/%3E%3Crect x='305' y='95' width='60' height='60' rx='6' fill='%2300a4ef'/%3E%3Crect x='235' y='165' width='60' height='60' rx='6' fill='%2300a4ef'/%3E%3Crect x='305' y='165' width='60' height='60' rx='6' fill='%2300a4ef'/%3E%3Ctext x='300' y='265' font-family='Arial,sans-serif' font-size='26' font-weight='900' fill='%23ffffff' text-anchor='middle'%3EWindows 11 / 10 Pro + Drivers%3C/text%3E%3Ctext x='300' y='298' font-family='Cairo,Arial,sans-serif' font-size='18' font-weight='bold' fill='%23fbbf24' text-anchor='middle'%3Eفورمات وتعاريف أصلية + أوفيس 2026 مفعّل%3C/text%3E%3Ctext x='300' y='390' font-family='Cairo,Arial,sans-serif' font-size='26' font-weight='900' fill='%23ffffff' text-anchor='middle'%3Eمركز الحبيب - أنظمة التشغيل والتعريفات%3C/text%3E%3C/svg%3E",
       iphone_15: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 600 450' width='100%25' height='100%25'%3E%3Cdefs%3E%3ClinearGradient id='bgI15' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%230f172a'/%3E%3Cstop offset='100%25' stop-color='%23030712'/%3E%3C/linearGradient%3E%3ClinearGradient id='blueTitanium' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%2338bdf8'/%3E%3Cstop offset='50%25' stop-color='%230284c7'/%3E%3Cstop offset='100%25' stop-color='%230f172a'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='600' height='450' fill='url(%23bgI15)' rx='28'/%3E%3Cg transform='translate(190, 35)'%3E%3Crect x='20' y='10' width='180' height='350' rx='32' fill='url(%23blueTitanium)' stroke='%2338bdf8' stroke-width='2' filter='drop-shadow(0 20px 35px rgba(2,132,199,0.35))'/%3E%3Crect x='25' y='15' width='170' height='340' rx='28' fill='%23020617'/%3E%3Crect x='27' y='17' width='166' height='336' rx='26' fill='%230b1329'/%3E%3Crect x='78' y='25' width='64' height='16' rx='8' fill='%23000000'/%3E%3Ctext x='110' y='195' fill='%2338bdf8' font-family='sans-serif' font-size='13' font-weight='900' text-anchor='middle'%3EiPHONE 15 PRO%3C/text%3E%3Ctext x='110' y='215' fill='%2393c5fd' font-family='sans-serif' font-size='10' font-weight='bold' text-anchor='middle'%3EA17 Pro • Blue Titanium%3C/text%3E%3C/g%3E%3C/svg%3E",
 
       logo: "data:image/webp;base64,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",
@@ -2287,6 +2363,40 @@
         description: "بطارية تدوم حتى 22 ساعة مع قوة معالجة رسومية استثنائية لصناع المحتوى المحترفين وهيكل Space Black المقاوم للبصمات.",
         price: "$2,250",
         montageImages: [ASSETS.macbook_m3, ASSETS.laptop]
+      },
+      // 1.5 قسم البرامج والصيانة الاحترافية
+      {
+        id: 4,
+        title: "باقة البرامج الهندسية والمونتاج الاحترافية 2026",
+        category: "software",
+        badge: "قسم البرامج والصيانة 🛠️",
+        image: ASSETS.software_adobe,
+        specs: "Adobe Premiere & After Effects • Photoshop • AutoCAD • 3ds Max • Blender",
+        description: "تنصيب وتفعيل كامل لأحدث حزم التصميم والمونتاج والبرامج الهندسية مع ضبط إعدادات كرت الشاشة RTX لتسريع الرندر.",
+        price: "متوفر بالمركز",
+        montageImages: [ASSETS.software_adobe, ASSETS.laptop]
+      },
+      {
+        id: 5,
+        title: "صيانة احترافية وترقية اللابتوبات (SSD & RAM وتبريد)",
+        category: "software",
+        badge: "فحص وصيانة فورية ⚡",
+        image: ASSETS.software_maint,
+        specs: "تنظيف تبريد وتبديل معجون حراري أصلي • ترقية هاردات NVMe SSD ورامات DDR4/DDR5",
+        description: "صيانة شاملة وتنظيف مراوح التبريد بمعجون حراري احترافي لخفض الحرارة، مع ترقية الهارد والرام لمضاعفة سرعة الجهاز.",
+        price: "كفالة وضمان",
+        montageImages: [ASSETS.software_maint, ASSETS.laptop]
+      },
+      {
+        id: 6,
+        title: "تثبيت أنظمة ويندوز 10 و11 الأصلية وحزمة التعريفات الشاملة",
+        category: "software",
+        badge: "ويندوز وتعاريف أصلية 💻",
+        image: ASSETS.software_win11,
+        specs: "Windows 11 / 10 Pro مفعّل • كافة التعريفات الرسمية • Office 2026 • برامج الحماية",
+        description: "فورمات نظيف وتثبيت أحدث نسخة ويندوز مستقرة وسريعة للألعاب والمونتاج مع جميع تعريفات القطع وكرت الشاشة وحزمة الأوفيس.",
+        price: "جاهز فوراً",
+        montageImages: [ASSETS.software_win11, ASSETS.laptop]
       },
       // 2. إكسسوارات احترافية
       {
@@ -2357,11 +2467,39 @@
         montageImages: [ASSETS.iphone_15, ASSETS.phone]
       }];
 
-    let PRODUCTS = DEFAULT_PRODUCTS;
+    let PRODUCTS = [...DEFAULT_PRODUCTS];
     try {
-      const savedProds = localStorage.getItem('habib_custom_products');
-      if (savedProds) {
-        PRODUCTS = JSON.parse(savedProds);
+      const stateEl = document.getElementById('embeddedStoreState');
+      let embeddedData = null;
+      if (stateEl && stateEl.textContent && stateEl.textContent.trim().length > 2) {
+        embeddedData = JSON.parse(stateEl.textContent);
+      }
+      const savedVersion = parseInt(localStorage.getItem('habib_embedded_version') || '0', 10);
+
+      if (embeddedData && embeddedData.version && embeddedData.version > savedVersion && Array.isArray(embeddedData.products) && embeddedData.products.length > 0) {
+        PRODUCTS = hydrateProductsFromDelta(embeddedData.products);
+        localStorage.setItem('habib_custom_products', JSON.stringify(PRODUCTS));
+        localStorage.setItem('habib_embedded_version', embeddedData.version.toString());
+        if (Array.isArray(embeddedData.ticker) && embeddedData.ticker.length > 0) {
+          localStorage.setItem('habib_custom_ticker', JSON.stringify(embeddedData.ticker));
+        }
+        if (embeddedData.topbar && typeof embeddedData.topbar === 'object') {
+          localStorage.setItem('habib_custom_topbar', JSON.stringify(embeddedData.topbar));
+        }
+      } else {
+        const savedProds = localStorage.getItem('habib_custom_products');
+        if (savedProds) {
+          const parsedProds = JSON.parse(savedProds);
+          if (Array.isArray(parsedProds) && parsedProds.length > 0) {
+            PRODUCTS = parsedProds;
+            // Ensure new 'software' category default items exist if upgrading from older local storage
+            if (!PRODUCTS.some(p => p.category === 'software')) {
+              const swDefaults = DEFAULT_PRODUCTS.filter(p => p.category === 'software');
+              PRODUCTS = [...PRODUCTS.slice(0, 3), ...swDefaults, ...PRODUCTS.slice(3)];
+              localStorage.setItem('habib_custom_products', JSON.stringify(PRODUCTS));
+            }
+          }
+        }
       }
     } catch(e) {}
 
@@ -2677,7 +2815,7 @@
       const moreCountEl = document.getElementById('count-more');
       if (moreCountEl) moreCountEl.textContent = PRODUCTS.length;
 
-      ['laptops', 'accessories', 'phones'].forEach(cat => {
+      ['laptops', 'software', 'accessories', 'phones'].forEach(cat => {
         const el = document.getElementById(`count-${cat}`);
         if (el) el.textContent = PRODUCTS.filter(p => p.category === cat).length;
       });
@@ -2828,29 +2966,143 @@
     let comparedProductIds = [];
 
     
-    function handlePageMontageFiles(event) {
+    // --- AUTOMATIC DEVICE IMAGE UPLOAD TO WEBSITE & DIRECT WEB URL GENERATOR (رفع الصور للموقع وتوليد رابط ويب عالمي يفتح على جميع المتصفحات) ---
+    function optimizeImageFileToJpegDataUrl(file, maxDim = 1200, quality = 0.85) {
+      return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onerror = () => resolve(null);
+        reader.onload = function(e) {
+          const rawDataUrl = e.target.result;
+          const img = new Image();
+          img.onload = function() {
+            try {
+              let w = img.width || 800;
+              let h = img.height || 600;
+              if (w > maxDim || h > maxDim) {
+                if (w > h) {
+                  h = Math.round((h * maxDim) / w);
+                  w = maxDim;
+                } else {
+                  w = Math.round((w * maxDim) / h);
+                  h = maxDim;
+                }
+              }
+              const canvas = document.createElement('canvas');
+              canvas.width = w;
+              canvas.height = h;
+              const ctx = canvas.getContext('2d');
+              ctx.fillStyle = '#080c14';
+              ctx.fillRect(0, 0, w, h);
+              ctx.drawImage(img, 0, 0, w, h);
+              const compressedDataUrl = canvas.toDataURL('image/jpeg', quality);
+              resolve(compressedDataUrl || rawDataUrl);
+            } catch (err) {
+              resolve(rawDataUrl);
+            }
+          };
+          img.onerror = () => resolve(rawDataUrl);
+          img.src = rawDataUrl;
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+
+    async function uploadDeviceImageToWebUrl(file) {
+      const optimizedDataUrl = await optimizeImageFileToJpegDataUrl(file);
+      if (!optimizedDataUrl) return ASSETS.laptop;
+
+      const cleanBaseName = (file.name || 'photo').replace(/[^a-zA-Z0-9_-]/g, '_').replace(/_{2,}/g, '_').slice(0, 28);
+      const fileName = `img_${Date.now()}_${Math.floor(Math.random() * 1000)}_${cleanBaseName}.jpg`;
+      const repoPath = `uploads/${fileName}`;
+
+      // If GitHub Token & Repo are configured, upload the binary JPEG directly to the website repository on GitHub and return its universal https:// web URL!
+      if (githubToken && githubRepo) {
+        try {
+          const base64Content = optimizedDataUrl.split(',')[1] || "";
+          if (base64Content) {
+            const apiUrl = `https://api.github.com/repos/${githubRepo}/contents/${repoPath}`;
+            const putRes = await fetch(apiUrl, {
+              method: 'PUT',
+              headers: {
+                'Authorization': `Bearer ${githubToken}`,
+                'Accept': 'application/vnd.github+json',
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                message: `رفع صورة منتج للموقع: ${fileName}`,
+                content: base64Content
+              })
+            });
+            if (putRes.ok) {
+              // Return direct global CDN/raw web URL that opens immediately on all browsers worldwide
+              const webUrl = `https://raw.githubusercontent.com/${githubRepo}/main/${repoPath}`;
+              return webUrl;
+            }
+          }
+        } catch (err) {}
+      }
+
+      // Queue for automatic GitHub upload as soon as GitHub Token is active, and return universal web data URL for immediate display
+      try {
+        const pending = JSON.parse(localStorage.getItem('habib_pending_image_uploads') || '[]');
+        pending.push({ repoPath, dataUrl: optimizedDataUrl, createdAt: Date.now() });
+        if (pending.length > 30) pending.shift();
+        localStorage.setItem('habib_pending_image_uploads', JSON.stringify(pending));
+      } catch (e) {}
+
+      return optimizedDataUrl;
+    }
+
+    function copyImageWebUrlInput(inputId) {
+      const el = document.getElementById(inputId);
+      if (!el || !el.value.trim()) {
+        showToast("لا يوجد رابط صورة لنسخه حالياً.");
+        return;
+      }
+      fallbackCopy(el.value.trim());
+      showToast("تم نسخ رابط الويب للصورة بنجاح! 🔗");
+    }
+
+    function openImageWebUrlInBrowser(inputId) {
+      const el = document.getElementById(inputId);
+      if (!el || !el.value.trim()) {
+        showToast("يرجى رفع صورة أولاً لفتح رابطها في المتصفح.");
+        return;
+      }
+      const url = el.value.trim();
+      const win = window.open();
+      if (win) {
+        if (url.startsWith('http')) {
+          win.location.href = url;
+        } else {
+          win.document.write(`<!DOCTYPE html><html><head><title>معاينة صورة المتجر</title><meta name="viewport" content="width=device-width,initial-scale=1"></head><body style="margin:0;background:#080c14;display:flex;align-items:center;justify-content:center;min-height:100vh;"><img src="${url}" style="max-width:98vw;max-height:96vh;border-radius:12px;box-shadow:0 10px 40px rgba(0,0,0,0.8);"></body></html>`);
+          win.document.close();
+        }
+      }
+    }
+
+    function copyDirectStringUrl(url) {
+      if (!url) return;
+      fallbackCopy(url);
+      showToast("تم نسخ رابط الصورة بنجاح! 🔗");
+    }
+
+    async function handlePageMontageFiles(event) {
       if (!isAdminLoggedIn) {
         showToast("إضافة صور المونتاج مخصصة للمشرف فقط 🔒");
         return;
       }
-      const files = event.target.files;
-      if (!files || files.length === 0) return;
-      
-      let loadedCount = 0;
-      for (let i = 0; i < files.length; i++) {
-        const file = files[i];
-        const reader = new FileReader();
-        reader.onload = function(e) {
-          currentProductMontageImages.push(e.target.result);
-          loadedCount++;
-          if (loadedCount === files.length) {
-            renderPageMontageThumbnails();
-            showToast(`تمت إضافة ${loadedCount} صور للمونتاج بنجاح! 📸`);
-          }
-        };
-        reader.readAsDataURL(file);
-      }
+      const files = event.target.files ? Array.from(event.target.files) : [];
+      if (files.length === 0) return;
       event.target.value = '';
+
+      showToast(`جاري رفع ${files.length} صور على الموقع وتوليد روابط ويب لها... ☁️⏳`);
+      for (let i = 0; i < files.length; i++) {
+        const webUrl = await uploadDeviceImageToWebUrl(files[i]);
+        currentProductMontageImages.push(webUrl);
+      }
+      renderPageMontageThumbnails();
+      showToast(`تم رفع ${files.length} صور للموقع وتوليد روابط ويب لها بنجاح! 🌐📸`);
     }
 
     function addPageMontageUrl() {
@@ -2864,7 +3116,7 @@
       currentProductMontageImages.push(url);
       input.value = '';
       renderPageMontageThumbnails();
-      showToast("تمت إضافة صورة المونتاج بنجاح! 📸");
+      showToast("تمت إضافة رابط صورة المونتاج بنجاح! 📸");
     }
 
     function removePageMontageImage(idx) {
@@ -2877,24 +3129,27 @@
       const container = document.getElementById('pageMontageList');
       if (!container) return;
       if (currentProductMontageImages.length === 0) {
-        container.innerHTML = `<span class="text-xs text-slate-500 py-2">لم تتم إضافة صور مونتاج إضافية بعد. يمكنك رفع صور كثيرة الآن.</span>`;
+        container.innerHTML = `<span class="text-xs text-slate-500 py-2">لم تتم إضافة صور مونتاج إضافية بعد. يمكنك رفع صور كثيرة الآن وسيُنشأ لها رابط ويب تلقائياً.</span>`;
         return;
       }
       container.innerHTML = currentProductMontageImages.map((img, i) => `
-        <div class="relative w-16 h-16 rounded-xl overflow-hidden border border-amber-500/40 group flex-shrink-0 bg-slate-900">
+        <div class="relative w-20 h-20 rounded-xl overflow-hidden border border-amber-500/40 group flex-shrink-0 bg-slate-900">
           <img src="${img}" class="w-full h-full object-cover">
-          <button type="button" onclick="removePageMontageImage(${i})" class="absolute top-0.5 right-0.5 w-5 h-5 rounded-full bg-rose-600 text-white text-[10px] flex items-center justify-center opacity-80 hover:opacity-100 shadow" title="حذف الصورة">
+          <button type="button" onclick="removePageMontageImage(${i})" class="absolute top-0.5 right-0.5 w-5 h-5 rounded-full bg-rose-600 text-white text-[10px] flex items-center justify-center opacity-90 hover:opacity-100 shadow" title="حذف الصورة">
             <i class="fa-solid fa-xmark"></i>
+          </button>
+          <button type="button" onclick="copyDirectStringUrl(currentProductMontageImages[${i}])" class="absolute bottom-0.5 left-0.5 right-0.5 py-0.5 rounded bg-slate-950/85 text-cyan-300 text-[9px] font-bold flex items-center justify-center gap-0.5 hover:bg-cyan-950" title="نسخ رابط الويب لهذه الصورة">
+            <i class="fa-solid fa-link text-[8px]"></i>
+            <span>${img.startsWith('http') ? 'رابط ويب 🌐' : 'نسخ الرابط'}</span>
           </button>
         </div>
       `).join('');
     }
 
-    
-    // --- DIRECT MODAL PHOTO MANAGEMENT (المشرف فقط: تعديل، إضافة كثيفة، وحذف صور المنتج) ---
+    // --- DIRECT MODAL PHOTO MANAGEMENT (المشرف فقط: تعديل، إضافة كثيفة، وحذف صور المنتج مع توليد رابط ويب) ---
     let currentReplacingPhoto = null; // { prodId, imgIdx }
 
-    function handleDirectModalPhotosUpload(prodId, event) {
+    async function handleDirectModalPhotosUpload(prodId, event) {
       if (!isAdminLoggedIn) {
         showToast("إضافة وتعديل الصور مخصصة للمشرف فقط 🔒");
         return;
@@ -2904,28 +3159,22 @@
       if (!p.montageImages || !Array.isArray(p.montageImages)) {
         p.montageImages = [p.image || ASSETS.laptop];
       }
-      const files = event.target.files;
-      if (!files || files.length === 0) return;
-
-      let count = 0;
-      const total = files.length;
-      for (let i = 0; i < total; i++) {
-        const reader = new FileReader();
-        reader.onload = function(e) {
-          p.montageImages.push(e.target.result);
-          count++;
-          if (count === total) {
-            try {
-              localStorage.setItem('habib_custom_products', JSON.stringify(PRODUCTS));
-            } catch(err) {}
-            showToast(`تمت إضافة ${total} صور جديدة للمنتج بنجاح! 📸`);
-            openModal(prodId);
-            renderProducts();
-          }
-        };
-        reader.readAsDataURL(files[i]);
-      }
+      const files = event.target.files ? Array.from(event.target.files) : [];
+      if (files.length === 0) return;
       event.target.value = '';
+
+      showToast(`جاري رفع ${files.length} صور للموقع وتوليد روابط ويب... ☁️⏳`);
+      for (let i = 0; i < files.length; i++) {
+        const webUrl = await uploadDeviceImageToWebUrl(files[i]);
+        p.montageImages.push(webUrl);
+      }
+      try {
+        localStorage.setItem('habib_custom_products', JSON.stringify(PRODUCTS));
+      } catch(err) {}
+      autoSyncCloudMutation();
+      showToast(`تم رفع ${files.length} صور للموقع برابط ويب مباشر بنجاح! 🌐📸`);
+      openModal(prodId);
+      renderProducts();
     }
 
     function addDirectModalPhotoUrl(prodId) {
@@ -2949,7 +3198,8 @@
       try {
         localStorage.setItem('habib_custom_products', JSON.stringify(PRODUCTS));
       } catch(err) {}
-      showToast(urls.length > 1 ? `تمت إضافة ${urls.length} صور جديدة للمنتج! 📸` : "تمت إضافة الصورة للمنتج بنجاح! 📸");
+      autoSyncCloudMutation();
+      showToast(urls.length > 1 ? `تمت إضافة ${urls.length} روابط صور للمنتج! 📸` : "تمت إضافة رابط الصورة للمنتج بنجاح! 📸");
       openModal(prodId);
       renderProducts();
     }
@@ -2964,30 +3214,30 @@
       if (fileInput) fileInput.click();
     }
 
-    function handleModalReplacePhotoFile(event) {
+    async function handleModalReplacePhotoFile(event) {
       if (!isAdminLoggedIn || !currentReplacingPhoto) return;
       const file = event.target.files && event.target.files[0];
       if (!file) return;
       const { prodId, imgIdx } = currentReplacingPhoto;
+      event.target.value = '';
+      currentReplacingPhoto = null;
+
       const p = PRODUCTS.find(item => item.id === prodId);
       if (!p || !p.montageImages) return;
 
-      const reader = new FileReader();
-      reader.onload = function(e) {
-        p.montageImages[imgIdx] = e.target.result;
-        if (imgIdx === 0) {
-          p.image = e.target.result;
-        }
-        try {
-          localStorage.setItem('habib_custom_products', JSON.stringify(PRODUCTS));
-        } catch(err) {}
-        showToast("تم تعديل واستبدال صورة المنتج بنجاح! 🔄");
-        openModal(prodId);
-        renderProducts();
-      };
-      reader.readAsDataURL(file);
-      event.target.value = '';
-      currentReplacingPhoto = null;
+      showToast("جاري رفع الصورة الجديدة للموقع وتوليد رابط ويب... ☁️⏳");
+      const webUrl = await uploadDeviceImageToWebUrl(file);
+      p.montageImages[imgIdx] = webUrl;
+      if (imgIdx === 0) {
+        p.image = webUrl;
+      }
+      try {
+        localStorage.setItem('habib_custom_products', JSON.stringify(PRODUCTS));
+      } catch(err) {}
+      autoSyncCloudMutation();
+      showToast("تم رفع الصورة الجديدة للموقع برابط ويب مباشر! 🌐🔄");
+      openModal(prodId);
+      renderProducts();
     }
 
     function setModalProductAsMainPhoto(prodId, imgIdx) {
@@ -4148,6 +4398,7 @@
     function applyPagePresetImage(val) {
       const map = {
         'laptop': ASSETS.laptop,
+        'software': ASSETS.software_adobe,
         'mouse': ASSETS.gaming,
         'phone': ASSETS.phone
       };
@@ -4157,18 +4408,22 @@
       }
     }
 
-    function handlePageImageFile(event) {
+    async function handlePageImageFile(event) {
       const file = event.target.files && event.target.files[0];
       if (!file) return;
+      event.target.value = '';
 
-      const reader = new FileReader();
-      reader.onload = function(e) {
-        const dataUrl = e.target.result;
-        document.getElementById('pageImage').value = dataUrl;
-        updateLiveCard();
-        showToast("تم تحميل ومعاينة الصورة بنجاح! 📸");
-      };
-      reader.readAsDataURL(file);
+      showToast("جاري رفع الصورة للموقع وتوليد رابط ويب مباشر... ☁️⏳");
+      const webUrl = await uploadDeviceImageToWebUrl(file);
+      const pageImgInput = document.getElementById('pageImage');
+      if (pageImgInput) pageImgInput.value = webUrl;
+      const badge = document.getElementById('pageImageUploadBadge');
+      if (badge) {
+        badge.classList.remove('hidden');
+        badge.textContent = webUrl.startsWith('http') ? "تم الرفع برابط ويب عالمي 🌐" : "جاهزة للعرض على جميع المتصفحات 🌐";
+      }
+      updateLiveCard();
+      showToast(webUrl.startsWith('http') ? "تم رفع الصورة على الموقع ووضع رابط ويب مباشر لها! 🌐🚀" : "تم تجهيز الصورة وربطها لتفتح على جميع المتصفحات! 📸");
     }
 
     function submitProductPageForm() {
@@ -4242,6 +4497,7 @@
 
       closeAddProductPage();
       renderProducts();
+      autoSyncCloudMutation();
     }
 
     // --- ADMIN SYSTEM & EDIT CAPABILITY ---
@@ -4261,18 +4517,29 @@
       const tickerEditBtn = document.getElementById('adminTickerEditBtn');
       const topBarEditBtn = document.getElementById('adminTopBarEditBtn');
 
+      const visBtn = document.getElementById('visitorsCounterBtn');
       if (isAdminLoggedIn) {
         if (bar) bar.classList.remove('hidden');
         if (bannerEditBtn) bannerEditBtn.classList.remove('hidden');
         if (tickerEditBtn) tickerEditBtn.classList.remove('hidden');
         if (topBarEditBtn) topBarEditBtn.classList.remove('hidden');
         if (icon) icon.className = "fa-solid fa-lock-open text-amber-400 text-xs";
+        if (visBtn) {
+          visBtn.classList.remove('cursor-default');
+          visBtn.classList.add('cursor-pointer', 'hover:scale-105', 'active:scale-95');
+          visBtn.title = "خاص بالمشرف: اضغط لزيادة عدد الزوار (+2)";
+        }
       } else {
         if (bar) bar.classList.add('hidden');
         if (bannerEditBtn) bannerEditBtn.classList.add('hidden');
         if (tickerEditBtn) tickerEditBtn.classList.add('hidden');
         if (topBarEditBtn) topBarEditBtn.classList.add('hidden');
         if (icon) icon.className = "fa-solid fa-lock text-slate-500 text-xs";
+        if (visBtn) {
+          visBtn.classList.remove('cursor-pointer', 'hover:scale-105', 'active:scale-95');
+          visBtn.classList.add('cursor-default');
+          visBtn.title = "عدد الزوار المباشر لمتجر مركز الحبيب";
+        }
       }
       renderProducts();
     }
@@ -4342,6 +4609,7 @@
     function applyPresetImage(val) {
       const map = {
         'laptop': ASSETS.laptop,
+        'software': ASSETS.software_adobe,
         'mouse': ASSETS.gaming,
         'phone': ASSETS.phone
       };
@@ -4351,18 +4619,16 @@
       }
     }
 
-    function handleImageFileSelect(event) {
+    async function handleImageFileSelect(event) {
       const file = event.target.files && event.target.files[0];
       if (!file) return;
+      event.target.value = '';
 
-      const reader = new FileReader();
-      reader.onload = function(e) {
-        const dataUrl = e.target.result;
-        document.getElementById('editImage').value = dataUrl;
-        document.getElementById('editImagePreview').src = dataUrl;
-        showToast("تم تحميل ومعاينة الصورة الجديدة بنجاح! 📸");
-      };
-      reader.readAsDataURL(file);
+      showToast("جاري رفع الصورة للموقع وتوليد رابط ويب مباشر... ☁️⏳");
+      const webUrl = await uploadDeviceImageToWebUrl(file);
+      document.getElementById('editImage').value = webUrl;
+      document.getElementById('editImagePreview').src = webUrl;
+      showToast(webUrl.startsWith('http') ? "تم رفع الصورة على الموقع ووضع رابط ويب مباشر لها! 🌐🚀" : "تم تجهيز الصورة لتفتح على جميع المتصفحات! 📸");
     }
 
     document.getElementById('editImage').addEventListener('input', function() {
@@ -4452,10 +4718,16 @@
 
     
     
-    // --- CLOUD SYNC & FIREBASE REALTIME DATABASE ENGINE (المزامنة السحابية اللحظية) ---
+    // --- MULTI-CLOUD SYNC ENGINE (GitHub Direct API + JSONBin.io + Supabase - بدون سحابة غوغل) ---
     let cloudDbUrl = "";
+    let cloudApiKey = "";
+    let githubRepo = "habeb1990/habeb-centr";
+    let githubToken = "";
     try {
       cloudDbUrl = localStorage.getItem('habib_cloud_db_url') || "";
+      cloudApiKey = localStorage.getItem('habib_cloud_api_key') || "";
+      githubRepo = localStorage.getItem('habib_github_repo') || "habeb1990/habeb-centr";
+      githubToken = localStorage.getItem('habib_github_token') || "";
     } catch(e) {}
 
     function openCloudSyncModal() {
@@ -4466,7 +4738,13 @@
       }
       const modal = document.getElementById('cloudSyncModal');
       const input = document.getElementById('firebaseDbUrlInput');
+      const keyInput = document.getElementById('cloudApiKeyInput');
+      const repoInput = document.getElementById('githubRepoInput');
+      const tokenInput = document.getElementById('githubTokenInput');
       if (input) input.value = cloudDbUrl;
+      if (keyInput) keyInput.value = cloudApiKey;
+      if (repoInput) repoInput.value = githubRepo || "habeb1990/habeb-centr";
+      if (tokenInput) tokenInput.value = githubToken;
       updateCloudStatusUI();
       if (modal) modal.classList.remove('hidden');
     }
@@ -4481,132 +4759,530 @@
       const badge = document.getElementById('cloudStatusBadge');
       const timeLabel = document.getElementById('cloudLastSyncTime');
 
-      if (cloudDbUrl && cloudDbUrl.startsWith('http')) {
+      if (githubToken && githubRepo) {
+        if (dot) dot.className = "w-3 h-3 rounded-full bg-emerald-400 animate-ping";
+        if (badge) {
+          badge.className = "text-[10px] px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-mono border border-emerald-500/30 font-bold";
+          badge.textContent = "متصل بـ GitHub 🟢";
+        }
+        if (timeLabel) timeLabel.textContent = "مزامنة GitHub المباشرة (" + githubRepo + ")";
+      } else if (cloudDbUrl && cloudDbUrl.startsWith('http')) {
         if (dot) dot.className = "w-3 h-3 rounded-full bg-emerald-400 animate-ping";
         if (badge) {
           badge.className = "text-[10px] px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-mono border border-emerald-500/30 font-bold";
           badge.textContent = "السحابة متصلة 🟢";
         }
-        if (timeLabel) timeLabel.textContent = "متصل بـ Firebase Realtime";
+        if (timeLabel) timeLabel.textContent = "متصل بسحابة JSON الخارجية";
       } else {
         if (dot) dot.className = "w-3 h-3 rounded-full bg-amber-400";
         if (badge) {
           badge.className = "text-[10px] px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 font-mono";
-          badge.textContent = "محلي فقط 🟡";
+          badge.textContent = "قراءة تلقائية من GitHub 🟡";
         }
-        if (timeLabel) timeLabel.textContent = "غير مربوط بسحابة خارجية";
+        if (timeLabel) timeLabel.textContent = "ضع مفتاح GitHub Token لتفعيل الرفع التلقائي";
       }
     }
 
     function saveCloudSettings() {
       const input = document.getElementById('firebaseDbUrlInput');
+      const keyInput = document.getElementById('cloudApiKeyInput');
+      const repoInput = document.getElementById('githubRepoInput');
+      const tokenInput = document.getElementById('githubTokenInput');
+
       let val = input ? input.value.trim() : "";
       if (val.endsWith('/')) val = val.slice(0, -1);
+      let keyVal = keyInput ? keyInput.value.trim() : "";
+      let repoVal = repoInput ? repoInput.value.trim().replace(/^https?:\/\/github\.com\//i, '').replace(/\/+$/, '') : "habeb1990/habeb-centr";
+      let tokenVal = tokenInput ? tokenInput.value.trim() : "";
 
       if (val && !val.startsWith('http')) {
-        showToast("يرجى كتابة رابط صحيح يبدأ بـ https://");
+        showToast("يرجى كتابة رابط سحابي يبدأ بـ https://");
         return;
       }
 
       cloudDbUrl = val;
+      cloudApiKey = keyVal;
+      githubRepo = repoVal || "habeb1990/habeb-centr";
+      githubToken = tokenVal;
+
       try {
-        localStorage.setItem('habib_cloud_db_url', val);
+        localStorage.setItem('habib_cloud_db_url', cloudDbUrl);
+        localStorage.setItem('habib_cloud_api_key', cloudApiKey);
+        localStorage.setItem('habib_github_repo', githubRepo);
+        localStorage.setItem('habib_github_token', githubToken);
       } catch(e) {}
 
       updateCloudStatusUI();
-      if (val) {
-        showToast("تم حفظ وتفعيل الرابط السحابي بنجاح! جاري مزامنة البيانات... ☁️");
+      if (githubToken || cloudDbUrl) {
+        showToast("تم حفظ إعدادات السحابة بنجاح! جاري مزامنة المتجر... ☁️");
         syncCurrentDataToCloud();
       } else {
-        showToast("تم إيقاف المزامنة السحابية. المتجر يعمل بذاكرة الجهاز المحلية.");
+        showToast("تم حفظ اسم المستودع. أضف مفتاح GitHub Token أو رابط JSONBin لتفعيل الرفع الفوري.");
       }
     }
 
     function disconnectCloud() {
       cloudDbUrl = "";
+      cloudApiKey = "";
+      githubToken = "";
       try {
-        localStorage.setItem('habib_cloud_db_url');
+        localStorage.removeItem('habib_cloud_db_url');
+        localStorage.removeItem('habib_cloud_api_key');
+        localStorage.removeItem('habib_github_token');
       } catch(e) {}
       const input = document.getElementById('firebaseDbUrlInput');
+      const keyInput = document.getElementById('cloudApiKeyInput');
+      const tokenInput = document.getElementById('githubTokenInput');
       if (input) input.value = "";
+      if (keyInput) keyInput.value = "";
+      if (tokenInput) tokenInput.value = "";
       updateCloudStatusUI();
       showToast("تم فصل السحابة بنجاح.");
     }
 
-    async function syncCurrentDataToCloud(silent = false) {
-      if (!cloudDbUrl || !cloudDbUrl.startsWith('http')) {
-        if (!silent) showToast("يرجى إدخال رابط قاعدة بيانات Firebase أولاً للربط السحابي.");
-        return;
-      }
+    function encodeUtf8Base64(str) {
+      return btoa(unescape(encodeURIComponent(str)));
+    }
 
-      const payload = {
-        products: PRODUCTS,
+    // --- DELTA ASSET COMPRESSION ENGINE (حفظ الأيقونات والمؤثرات والأضواء والستايلات في الملف الأصلي ورفع التعديلات فقط) ---
+    const ASSET_REVERSE_MAP = {};
+    Object.keys(ASSETS).forEach(k => {
+      if (ASSETS[k]) ASSET_REVERSE_MAP[ASSETS[k]] = "@asset:" + k;
+    });
+
+    function compressImageRef(imgStr) {
+      if (!imgStr || typeof imgStr !== 'string') return imgStr;
+      return ASSET_REVERSE_MAP[imgStr] || imgStr;
+    }
+
+    function hydrateImageRef(imgRef) {
+      if (!imgRef || typeof imgRef !== 'string') return ASSETS.laptop;
+      if (imgRef.startsWith('@asset:')) {
+        const key = imgRef.slice(7);
+        return ASSETS[key] || ASSETS.laptop;
+      }
+      return imgRef;
+    }
+
+    function compressProductsForDelta(prods) {
+      if (!Array.isArray(prods)) return [];
+      return prods.map(p => {
+        const copy = Object.assign({}, p);
+        copy.image = compressImageRef(p.image);
+        if (Array.isArray(p.montageImages)) {
+          copy.montageImages = p.montageImages.map(m => compressImageRef(m));
+        }
+        return copy;
+      });
+    }
+
+    function hydrateProductsFromDelta(prods) {
+      if (!Array.isArray(prods)) return [];
+      return prods.map(p => {
+        const copy = Object.assign({}, p);
+        copy.image = hydrateImageRef(p.image);
+        if (Array.isArray(p.montageImages) && p.montageImages.length > 0) {
+          copy.montageImages = p.montageImages.map(m => hydrateImageRef(m));
+        } else {
+          copy.montageImages = [copy.image];
+        }
+        return copy;
+      });
+    }
+
+    function buildLightweightDeltaHtml(deltaPayload) {
+      const jsonStr = JSON.stringify(deltaPayload);
+      return `<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <title>ملف تعديلات متجر مركز الحبيب الخفيف (Delta Patch)</title>
+  <script id="embeddedStoreState" type="application/json">${jsonStr}<\/script>
+</head>
+<body style="background:#080c14;color:#f8fafc;font-family:sans-serif;text-align:center;padding:40px;">
+  <h2>ملف التعديلات الخفيف - متجر مركز الحبيب</h2>
+  <p>يحتوي هذا الملف على التعديلات المضافة فقط (بدون تكرار الأيقونات والمؤثرات والستايلات الثابتة) لسرعة الرفع والنشر الفوري.</p>
+</body>
+</html>`;
+    }
+
+    function applyCloudPayload(data, isManual = false) {
+      if (!data || typeof data !== 'object') return false;
+      const payload = (data.record && typeof data.record === 'object') ? data.record : data;
+      let changed = false;
+      if (Array.isArray(payload.products) && payload.products.length > 0) {
+        PRODUCTS = hydrateProductsFromDelta(payload.products);
+        try { localStorage.setItem('habib_custom_products', JSON.stringify(PRODUCTS)); } catch(e) {}
+        renderHeroSlider();
+        renderProducts();
+        changed = true;
+      }
+      if (Array.isArray(payload.ticker) && payload.ticker.length > 0) {
+        customTickerItems = payload.ticker;
+        try { localStorage.setItem('habib_custom_ticker', JSON.stringify(customTickerItems)); } catch(e) {}
+        renderLiveTicker();
+        changed = true;
+      }
+      if (payload.topbar && typeof payload.topbar === 'object') {
+        customTopBar = Object.assign({}, DEFAULT_TOPBAR, payload.topbar);
+        try { localStorage.setItem('habib_custom_topbar', JSON.stringify(customTopBar)); } catch(e) {}
+        hydrateTopBar();
+        changed = true;
+      }
+      if (payload.visitors && parseInt(payload.visitors, 10) > getStoredVisitors()) {
+        try { localStorage.setItem('habib_total_visitors', parseInt(payload.visitors, 10).toString()); } catch(e) {}
+        updateVisitorDisplay();
+      }
+      if (changed && isManual) {
+        showToast("تم تحديث وسحب التعديلات الخفيفة من السحابة بنجاح! 📥");
+      }
+      return changed;
+    }
+
+    async function pushFileToGitHubRepo(filePath, contentStr, commitMsg) {
+      if (!githubToken || !githubRepo) return false;
+      try {
+        const apiUrl = `https://api.github.com/repos/${githubRepo}/contents/${filePath}`;
+        let currentSha = "";
+        const getRes = await fetch(apiUrl, {
+          headers: {
+            'Authorization': `Bearer ${githubToken}`,
+            'Accept': 'application/vnd.github+json'
+          }
+        });
+        if (getRes.ok) {
+          const fileMeta = await getRes.json();
+          if (fileMeta && fileMeta.sha) currentSha = fileMeta.sha;
+        }
+        const bodyObj = {
+          message: commitMsg,
+          content: encodeUtf8Base64(contentStr)
+        };
+        if (currentSha) bodyObj.sha = currentSha;
+
+        const putRes = await fetch(apiUrl, {
+          method: 'PUT',
+          headers: {
+            'Authorization': `Bearer ${githubToken}`,
+            'Accept': 'application/vnd.github+json',
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(bodyObj)
+        });
+        return putRes.ok;
+      } catch (e) {
+        return false;
+      }
+    }
+
+    async function flushPendingDeviceImagesToGitHub() {
+      if (!githubToken || !githubRepo) return;
+      for (let i = 0; i < PRODUCTS.length; i++) {
+        const p = PRODUCTS[i];
+        if (p.image && p.image.startsWith("data:image/jpeg;base64,")) {
+          const b64 = p.image.split(",")[1] || "";
+          const fName = `img_${p.id || Date.now()}_main.jpg`;
+          const rPath = `uploads/${fName}`;
+          const ok = await pushBase64FileToGitHubRepo(rPath, b64, `رفع صورة منتج: ${fName}`);
+          if (ok) p.image = `https://raw.githubusercontent.com/${githubRepo}/main/${rPath}`;
+        }
+        if (Array.isArray(p.montageImages)) {
+          for (let j = 0; j < p.montageImages.length; j++) {
+            const mImg = p.montageImages[j];
+            if (mImg && mImg.startsWith("data:image/jpeg;base64,")) {
+              const b64 = mImg.split(",")[1] || "";
+              const fName = `img_${p.id || Date.now()}_${j}.jpg`;
+              const rPath = `uploads/${fName}`;
+              const ok = await pushBase64FileToGitHubRepo(rPath, b64, `رفع صورة مونتاج: ${fName}`);
+              if (ok) p.montageImages[j] = `https://raw.githubusercontent.com/${githubRepo}/main/${rPath}`;
+            }
+          }
+        }
+      }
+      try {
+        localStorage.setItem("habib_custom_products", JSON.stringify(PRODUCTS));
+        localStorage.removeItem("habib_pending_image_uploads");
+      } catch (e) {}
+    }
+
+    async function pushBase64FileToGitHubRepo(filePath, base64Content, commitMsg) {
+      if (!githubToken || !githubRepo || !base64Content) return false;
+      try {
+        const apiUrl = `https://api.github.com/repos/${githubRepo}/contents/${filePath}`;
+        let currentSha = "";
+        const getRes = await fetch(apiUrl, {
+          headers: {
+            "Authorization": `Bearer ${githubToken}`,
+            "Accept": "application/vnd.github+json"
+          }
+        });
+        if (getRes.ok) {
+          const fileMeta = await getRes.json();
+          if (fileMeta && fileMeta.sha) currentSha = fileMeta.sha;
+        }
+        const bodyObj = { message: commitMsg, content: base64Content };
+        if (currentSha) bodyObj.sha = currentSha;
+        const putRes = await fetch(apiUrl, {
+          method: "PUT",
+          headers: {
+            "Authorization": `Bearer ${githubToken}`,
+            "Accept": "application/vnd.github+json",
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify(bodyObj)
+        });
+        return putRes.ok;
+      } catch (e) {
+        return false;
+      }
+    }
+
+    async function syncCurrentDataToCloud(silent = false) {
+      await flushPendingDeviceImagesToGitHub();
+      // Compress payload so static icons/lights/styles in ASSETS are NEVER re-uploaded
+      const deltaPayload = {
+        version: Date.now(),
+        updatedAt: new Date().toISOString(),
+        visitors: getStoredVisitors(),
+        products: compressProductsForDelta(PRODUCTS),
         ticker: customTickerItems,
-        topbar: customTopBar,
-        updatedAt: new Date().toISOString()
+        topbar: customTopBar
       };
 
+      // 1. Direct GitHub Repository Sync (pushes ONLY the lightweight modifications files)
+      if (githubToken && githubRepo) {
+        const jsonOk = await pushFileToGitHubRepo(
+          'store_data.json',
+          JSON.stringify(deltaPayload),
+          'نشر تلقائي للتعديلات الخفيفة فقط - متجر مركز الحبيب'
+        );
+        const htmlPatchStr = buildLightweightDeltaHtml(deltaPayload);
+        await pushFileToGitHubRepo(
+          'habib_updates.html',
+          htmlPatchStr,
+          'تحديث ملف التعديلات الخفيف habib_updates.html'
+        );
+
+        if (jsonOk) {
+          if (!silent) showToast("تم رفع التعديلات الخفيفة فقط إلى GitHub ونشرها تلقائياً لجميع المتصفحات واللابتوبات! 🚀");
+          const timeLabel = document.getElementById('cloudLastSyncTime');
+          if (timeLabel) timeLabel.textContent = "آخر نشر تلقائي على GitHub: " + new Date().toLocaleTimeString('ar-SA');
+          return true;
+        } else {
+          if (!silent) showToast("تعذر الرفع التلقائي على GitHub: تأكد من صلاحية مفتاح Token (repo) واسم المستودع.");
+        }
+      }
+
+      // 2. External JSON Cloud Sync (JSONBin.io / Supabase / REST)
+      if (!cloudDbUrl || !cloudDbUrl.startsWith('http')) {
+        if (!silent && !githubToken) {
+          showToast("يرجى إدخال مفتاح GitHub Token أو رابط JSONBin.io أولاً لتفعيل المزامنة التلقائية.");
+        }
+        return false;
+      }
+
       try {
-        const url = `${cloudDbUrl}/store_data.json`;
+        const isJsonBin = cloudDbUrl.includes('jsonbin.io');
+        const url = isJsonBin ? cloudDbUrl : (cloudDbUrl.endsWith('.json') ? cloudDbUrl : `${cloudDbUrl}/store_data.json`);
+        const headers = { 'Content-Type': 'application/json' };
+        if (cloudApiKey) {
+          headers['X-Master-Key'] = cloudApiKey;
+          headers['X-Access-Key'] = cloudApiKey;
+          headers['apikey'] = cloudApiKey;
+          headers['Authorization'] = cloudApiKey.startsWith('Bearer ') ? cloudApiKey : `Bearer ${cloudApiKey}`;
+        }
+
         const res = await fetch(url, {
           method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
+          headers: headers,
+          body: JSON.stringify(deltaPayload)
         });
 
         if (res.ok) {
-          if (!silent) showToast("تم رفع وحفظ كافة بيانات المتجر والصور في السحابة بنجاح! 🚀");
+          if (!silent) showToast("تم رفع التعديلات الخفيفة فقط إلى السحابة ونشرها بنجاح! 🚀");
           const timeLabel = document.getElementById('cloudLastSyncTime');
           if (timeLabel) timeLabel.textContent = "آخر رفع: " + new Date().toLocaleTimeString('ar-SA');
+          return true;
         } else {
-          if (!silent) showToast("تعذر الرفع: تأكد من تفعيل وضع الاختبار (Test Mode) في قواعد Firebase.");
+          if (!silent) showToast("تعذر الرفع: تأكد من صحة رابط السحابة أو مفتاح الوصول.");
         }
       } catch (err) {
-        if (!silent) showToast("تأكد من صحة رابط Firebase واتصال الإنترنت.");
+        if (!silent) showToast("تأكد من صحة رابط السحابة واتصال الإنترنت.");
       }
+      return false;
     }
 
     async function loadDataFromCloud(isManual = false) {
-      if (!cloudDbUrl || !cloudDbUrl.startsWith('http')) return;
-
-      try {
-        const url = `${cloudDbUrl}/store_data.json`;
-        const res = await fetch(url);
-        if (res.ok) {
-          const data = await res.json();
-          if (data && typeof data === 'object') {
-            if (Array.isArray(data.products) && data.products.length > 0) {
-              PRODUCTS = data.products;
-              try { localStorage.setItem('habib_custom_products', JSON.stringify(PRODUCTS)); } catch(e) {}
-              renderProducts();
-            }
-            if (Array.isArray(data.ticker) && data.ticker.length > 0) {
-              customTickerItems = data.ticker;
-              try { localStorage.setItem('habib_custom_ticker', JSON.stringify(customTickerItems)); } catch(e) {}
-              renderLiveTicker();
-            }
-            if (data.topbar && typeof data.topbar === 'object') {
-              customTopBar = data.topbar;
-              try { localStorage.setItem('habib_custom_topbar', JSON.stringify(customTopBar)); } catch(e) {}
-              hydrateTopBar();
-            }
-            if (isManual) showToast("تم تحديث وسحب أحدث بيانات المتجر من السحابة بنجاح! 📥");
+      // 1. Try External JSON Cloud if configured
+      if (cloudDbUrl && cloudDbUrl.startsWith('http')) {
+        try {
+          const isJsonBin = cloudDbUrl.includes('jsonbin.io');
+          const url = isJsonBin ? `${cloudDbUrl}/latest` : (cloudDbUrl.endsWith('.json') ? cloudDbUrl : `${cloudDbUrl}/store_data.json`);
+          const headers = {};
+          if (cloudApiKey) {
+            headers['X-Master-Key'] = cloudApiKey;
+            headers['X-Access-Key'] = cloudApiKey;
+            headers['apikey'] = cloudApiKey;
           }
-        }
-      } catch (err) {}
+          const res = await fetch(url, { headers });
+          if (res.ok) {
+            const data = await res.json();
+            if (applyCloudPayload(data, isManual)) return;
+          }
+        } catch (err) {}
+      }
+
+      // 2. Automatically read lightweight store_data.json OR habib_updates.html from GitHub repository for all visitors
+      if (githubRepo) {
+        try {
+          const rawJsonUrl = `https://raw.githubusercontent.com/${githubRepo}/main/store_data.json?t=${Date.now()}`;
+          const res = await fetch(rawJsonUrl);
+          if (res.ok) {
+            const data = await res.json();
+            if (applyCloudPayload(data, isManual)) return;
+          }
+        } catch (err) {}
+
+        try {
+          const rawHtmlPatchUrl = `https://raw.githubusercontent.com/${githubRepo}/main/habib_updates.html?t=${Date.now()}`;
+          const resPatch = await fetch(rawHtmlPatchUrl);
+          if (resPatch.ok) {
+            const patchHtml = await resPatch.text();
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(patchHtml, "text/html");
+            const emb = doc.getElementById('embeddedStoreState');
+            if (emb && emb.textContent && emb.textContent.trim().length > 2) {
+              const data = JSON.parse(emb.textContent);
+              applyCloudPayload(data, isManual);
+            }
+          }
+        } catch (err) {}
+      }
     }
 
     function autoSyncCloudMutation() {
-      if (cloudDbUrl && cloudDbUrl.startsWith('http')) {
+      syncEmbeddedStoreStateTag();
+      if ((githubToken && githubRepo) || (cloudDbUrl && cloudDbUrl.startsWith('http'))) {
         syncCurrentDataToCloud(true);
       }
     }
 
-    function exportUpdatedStoreFile() {
+    function syncEmbeddedStoreStateTag() {
+      const versionNow = Date.now();
+      const statePayload = {
+        version: versionNow,
+        updatedAt: new Date().toISOString(),
+        visitors: getStoredVisitors(),
+        products: compressProductsForDelta(PRODUCTS),
+        ticker: customTickerItems,
+        topbar: customTopBar
+      };
+      const stateEl = document.getElementById('embeddedStoreState');
+      if (stateEl) {
+        stateEl.textContent = JSON.stringify(statePayload);
+      }
       try {
+        localStorage.setItem('habib_embedded_version', versionNow.toString());
+      } catch(e) {}
+      return statePayload;
+    }
+
+    function showImportStatusBadge(message, isSuccess) {
+      const banner = document.getElementById('importStatusBanner');
+      if (!banner) return;
+      banner.textContent = message;
+      banner.classList.remove('hidden', 'bg-emerald-950', 'text-emerald-300', 'border-emerald-400/60', 'bg-rose-950', 'text-rose-300', 'border-rose-400/60');
+      banner.classList.add('inline-flex');
+      if (isSuccess) {
+        banner.classList.add('bg-emerald-950', 'text-emerald-300', 'border', 'border-emerald-400/60');
+      } else {
+        banner.classList.add('bg-rose-950', 'text-rose-300', 'border', 'border-rose-400/60');
+      }
+    }
+
+    // Exports ONLY the lightweight modifications HTML (habib_updates.html - a few KB!) without duplicating the static icons/lights/styles
+    function exportUpdatedStoreFile() {
+      if (!isAdminLoggedIn) {
+        showToast("تصدير ملف التعديلات مخصص للمشرف فقط 🔒");
+        toggleAdminPrompt();
+        return;
+      }
+      try {
+        const deltaPayload = syncEmbeddedStoreStateTag();
+        const lightweightHtml = buildLightweightDeltaHtml(deltaPayload);
+
+        const blob = new Blob([lightweightHtml], { type: 'text/html;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'habib_updates.html';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+
+        // Also automatically publish the lightweight modifications to GitHub / Cloud if connected
+        autoSyncCloudMutation();
+
+        showToast("تم حفظ وتصدير ملف التعديلات الخفيف فقط (habib_updates.html) بدون تكرار الملفات الثابتة! ⚡");
+      } catch (err) {
+        showToast("حدث خطأ أثناء تصدير ملف التعديلات الخفيف.");
+      }
+    }
+
+    // Exports the full original base index.html (with all static icons, styles, and lights + current modifications)
+    function exportFullBaseStoreFile() {
+      if (!isAdminLoggedIn) {
+        showToast("تصدير ملف المتجر مخصص للمشرف فقط 🔒");
+        toggleAdminPrompt();
+        return;
+      }
+      try {
+        syncEmbeddedStoreStateTag();
+        const bar = document.getElementById('adminStatusBar');
+        const cloudModal = document.getElementById('cloudSyncModal');
+        const passModal = document.getElementById('adminPassModal');
+        const editM = document.getElementById('adminEditModal');
+        const addPage = document.getElementById('addProductPageView');
+        const mainView = document.getElementById('mainStoreView');
+        const bannerEditBtn = document.getElementById('adminBannerEditBtn');
+        const tickerEditBtn = document.getElementById('adminTickerEditBtn');
+        const topBarEditBtn = document.getElementById('adminTopBarEditBtn');
+        const icon = document.getElementById('adminLockIcon');
+        const visBtn = document.getElementById('visitorsCounterBtn');
+        const statusBanner = document.getElementById('importStatusBanner');
+
+        const wasAddPageOpen = addPage && !addPage.classList.contains('hidden');
+        if (bar) bar.classList.add('hidden');
+        if (cloudModal) cloudModal.classList.add('hidden');
+        if (passModal) passModal.classList.add('hidden');
+        if (editM) editM.classList.add('hidden');
+        if (addPage) addPage.classList.add('hidden');
+        if (mainView) mainView.classList.remove('hidden');
+        if (bannerEditBtn) bannerEditBtn.classList.add('hidden');
+        if (tickerEditBtn) tickerEditBtn.classList.add('hidden');
+        if (topBarEditBtn) topBarEditBtn.classList.add('hidden');
+        if (statusBanner) statusBanner.classList.add('hidden');
+        if (icon) icon.className = "fa-solid fa-lock text-amber-400 text-base";
+        if (visBtn) {
+          visBtn.classList.remove('cursor-pointer', 'hover:scale-105', 'active:scale-95');
+          visBtn.classList.add('cursor-default');
+        }
+
+        const prevAdmin = isAdminLoggedIn;
+        isAdminLoggedIn = false;
+        renderProducts();
+
         let htmlSource = document.documentElement.outerHTML;
         if (!htmlSource.startsWith('<!DOCTYPE html>')) {
           htmlSource = '<!DOCTYPE html>\n' + htmlSource;
+        }
+
+        isAdminLoggedIn = prevAdmin;
+        updateAdminUI();
+        if (wasAddPageOpen && addPage && mainView) {
+          addPage.classList.remove('hidden');
+          mainView.classList.add('hidden');
         }
 
         const blob = new Blob([htmlSource], { type: 'text/html;charset=utf-8' });
@@ -4619,15 +5295,153 @@
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
 
-        showToast("تم تصدير وتحميل ملف index.html المحدث بنجاح! يمكنك رفعه لـ GitHub 📁");
+        showToast("تم تنزيل الملف الأصلي الثابت كاملاً (index.html) بنجاح! 📁");
       } catch (err) {
-        showToast("حدث خطأ أثناء تصدير الملف.");
+        showToast("حدث خطأ أثناء تصدير الملف الكامل.");
       }
     }
 
-    // --- AUTOMATIC VISITOR COUNTER ENGINE (زيادة 5 زوار تلقائياً عند كل دخول أو ضغط) ---
+    // --- ADMIN-ONLY HTML IMPORT & AUTOMATIC DELTA PUBLISH ENGINE ---
+    function triggerImportStoreHtml() {
+      if (!isAdminLoggedIn) {
+        showToast("ميزة استيراد ملف HTML ونشر التعديلات مخصصة للمشرف فقط 🔒");
+        toggleAdminPrompt();
+        return;
+      }
+      // Hide status badge before starting a new import attempt so it only shows upon result
+      const banner = document.getElementById('importStatusBanner');
+      if (banner) banner.classList.add('hidden');
+
+      const fileInput = document.getElementById('importStoreHtmlInput');
+      if (fileInput) {
+        fileInput.value = "";
+        fileInput.click();
+      }
+    }
+
+    function handleImportStoreHtmlFile(event) {
+      if (!isAdminLoggedIn) {
+        showToast("هذه الصلاحية للمشرف فقط 🔒");
+        return;
+      }
+      const file = event.target.files && event.target.files[0];
+      if (!file) return;
+
+      // Validate file extension (.html or .htm)
+      const lowerName = file.name.toLowerCase();
+      if (!lowerName.endsWith('.html') && !lowerName.endsWith('.htm')) {
+        showImportStatusBadge("فشل استيراد ❌", false);
+        showToast("فشل استيراد ❌ (الصيغة يجب أن تكون HTML)");
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onerror = function() {
+        showImportStatusBadge("فشل استيراد ❌", false);
+        showToast("فشل استيراد ❌");
+      };
+      reader.onload = async function(e) {
+        try {
+          const content = e.target.result || "";
+          if (!content || (!content.toLowerCase().includes('<html') && !content.includes('embeddedStoreState'))) {
+            showImportStatusBadge("فشل استيراد ❌", false);
+            showToast("فشل استيراد ❌");
+            return;
+          }
+
+          const parser = new DOMParser();
+          const doc = parser.parseFromString(content, "text/html");
+
+          const hasStoreStructure = doc.getElementById('embeddedStoreState') || doc.getElementById('productsGrid') || content.includes('DEFAULT_PRODUCTS');
+          if (!hasStoreStructure) {
+            showImportStatusBadge("فشل استيراد ❌", false);
+            showToast("فشل استيراد ❌");
+            return;
+          }
+
+          let importedState = null;
+          const embeddedEl = doc.getElementById('embeddedStoreState');
+          if (embeddedEl && embeddedEl.textContent && embeddedEl.textContent.trim().length > 2) {
+            try {
+              importedState = JSON.parse(embeddedEl.textContent);
+            } catch (parseErr) {}
+          }
+
+          if (importedState && Array.isArray(importedState.products) && importedState.products.length > 0) {
+            // Hydrate delta products onto permanent base ASSETS (icons, effects, lights, styles remain untouched)
+            PRODUCTS = hydrateProductsFromDelta(importedState.products);
+            if (Array.isArray(importedState.ticker) && importedState.ticker.length > 0) {
+              customTickerItems = importedState.ticker;
+            }
+            if (importedState.topbar && typeof importedState.topbar === 'object') {
+              customTopBar = Object.assign({}, DEFAULT_TOPBAR, importedState.topbar);
+            }
+            if (importedState.visitors && parseInt(importedState.visitors, 10) > getStoredVisitors()) {
+              try { localStorage.setItem('habib_total_visitors', parseInt(importedState.visitors, 10).toString()); } catch(e) {}
+            }
+          } else {
+            const importedTitle = doc.getElementById('topBarStoreTitle');
+            const importedBadge = doc.getElementById('topBarStoreBadge');
+            const importedSub = doc.getElementById('topBarStoreSubtitle');
+            if (importedTitle && importedTitle.textContent.trim()) {
+              customTopBar.title = importedTitle.textContent.trim();
+            }
+            if (importedBadge && importedBadge.textContent.trim()) {
+              customTopBar.badge = importedBadge.textContent.trim();
+            }
+            if (importedSub && importedSub.textContent.trim()) {
+              customTopBar.subtitle = importedSub.textContent.trim();
+            }
+          }
+
+          // Save modifications immediately to localStorage
+          const newVersion = Date.now();
+          try {
+            localStorage.setItem('habib_custom_products', JSON.stringify(PRODUCTS));
+            localStorage.setItem('habib_custom_ticker', JSON.stringify(customTickerItems));
+            localStorage.setItem('habib_custom_topbar', JSON.stringify(customTopBar));
+            localStorage.setItem('habib_embedded_version', newVersion.toString());
+          } catch (storageErr) {}
+
+          // Take a lightweight HTML snapshot of the modifications (without duplicating static icons/styles)
+          const deltaPayload = syncEmbeddedStoreStateTag();
+          const lightweightPatchHtml = buildLightweightDeltaHtml(deltaPayload);
+          const patchBlob = new Blob([lightweightPatchHtml], { type: 'text/html;charset=utf-8' });
+          const patchUrl = URL.createObjectURL(patchBlob);
+          const patchLink = document.createElement('a');
+          patchLink.href = patchUrl;
+          patchLink.download = 'habib_updates.html';
+          document.body.appendChild(patchLink);
+          patchLink.click();
+          document.body.removeChild(patchLink);
+          URL.revokeObjectURL(patchUrl);
+
+          // Apply modifications immediately to the live store UI
+          hydrateTopBar();
+          renderLiveTicker();
+          renderHeroSlider();
+          renderProducts();
+          updateVisitorDisplay();
+          closeCloudSyncModal();
+
+          // Automatically upload ONLY the lightweight modifications to GitHub / Cloud so all browsers and laptops update
+          await syncCurrentDataToCloud(true);
+
+          triggerMagicBurst(window.innerWidth / 2, 100, true);
+          // Show the success badge ONLY now that the HTML import succeeded
+          showImportStatusBadge("تم الرفع وتم الاستيراد بنجاح ونشر التعديلات مباشرة ✅", true);
+          showToast("تم الرفع وتم الاستيراد بنجاح ونشر التعديلات مباشرة ✅");
+        } catch (err) {
+          showImportStatusBadge("فشل استيراد ❌", false);
+          showToast("فشل استيراد ❌");
+        }
+      };
+      reader.readAsText(file, "UTF-8");
+    }
+
+    // --- AUTOMATIC VISITOR COUNTER ENGINE (زيادة 2 زوار تلقائياً لكل دخول أو عودة، والضغط اليدوي للمشرف فقط) ---
     function formatArabicVisitors(count) {
-      if (!count || count <= 0) return "5 زوار";
+      if (!count || count <= 0) return "زائرين (2)";
       if (count === 1) return "زائر واحد (1)";
       if (count === 2) return "زائرين (2)";
       if (count >= 3 && count <= 10) return `${count} زوار`;
@@ -4637,7 +5451,7 @@
 
     function getStoredVisitors() {
       let count = parseInt(localStorage.getItem('habib_total_visitors') || '0', 10);
-      return count > 0 ? count : 5;
+      return count > 0 ? count : 2;
     }
 
     function updateVisitorDisplay() {
@@ -4648,35 +5462,68 @@
     }
 
     function incrementVisitorsByFive(isAutomatic = true) {
+      // إذا كان استدعاء يدوي بالضغط، لا يُسمح إلا للمشرف فقط بزيادة عدد الزوار
+      if (!isAutomatic && !isAdminLoggedIn) {
+        return;
+      }
       let count = parseInt(localStorage.getItem('habib_total_visitors') || '0', 10);
-      count += 5; // زيادة خمسة زوار تلقائياً في كل دخول أو ضغط
+      try {
+        const stateEl = document.getElementById('embeddedStoreState');
+        if (stateEl && stateEl.textContent && stateEl.textContent.trim().length > 2) {
+          const emb = JSON.parse(stateEl.textContent);
+          if (emb && emb.visitors && parseInt(emb.visitors, 10) > count) {
+            count = parseInt(emb.visitors, 10);
+          }
+        }
+      } catch(e) {}
+
+      count += 2; // يضاف عدد الزوار اثنين (+2) عند كل دخول أو ضغط من المشرف
       try {
         localStorage.setItem('habib_total_visitors', count.toString());
       } catch(e) {}
       updateVisitorDisplay();
 
-      if (!isAutomatic) {
+      if (!isAutomatic && isAdminLoggedIn) {
         const btn = document.getElementById('visitorsCounterBtn');
         if (btn) {
           const rect = btn.getBoundingClientRect();
           triggerMagicBurst(rect.left + rect.width / 2, rect.top + rect.height / 2, true);
         }
-        showToast(`عدد الزوار الآن: ${formatArabicVisitors(count)} 🚀`);
+        showToast(`تمت زيادة عدد الزوار (+2) بواسطة المشرف: ${formatArabicVisitors(count)} 🚀`);
       }
     }
 
     function handleVisitorCounterClick() {
+      // المستخدم العادي لا يستطيع الضغط لزيادة عدد الزوار؛ فقط المشرف يستطيع ذلك
+      if (!isAdminLoggedIn) {
+        return;
+      }
       incrementVisitorsByFive(false);
     }
 
     function initVisitorCounter() {
-      // عند الدخول فوراً إلى صفحة المتجر من أي جهاز أو أي لابتوب: زيادة 5 زوار تلقائياً
+      // عند الدخول فوراً إلى صفحة المتجر من أي جهاز أو أي لابتوب: زيادة 2 زوار تلقائياً
       incrementVisitorsByFive(true);
     }
 
-    // عند خروج الزائر وعودته إلى الصفحة: زيادة 5 زوار تلقائياً
+    // عند خروج الزائر وعودته إلى الصفحة من أي متصفح أو موبايل أو لابتوب: زيادة 2 زوار تلقائياً
+    let wasStoreHiddenOrBlurred = false;
     document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'visible') {
+      if (document.visibilityState === 'hidden') {
+        wasStoreHiddenOrBlurred = true;
+      } else if (document.visibilityState === 'visible') {
+        wasStoreHiddenOrBlurred = false;
+        incrementVisitorsByFive(true);
+      }
+    });
+
+    window.addEventListener('blur', () => {
+      wasStoreHiddenOrBlurred = true;
+    });
+
+    window.addEventListener('focus', () => {
+      if (wasStoreHiddenOrBlurred) {
+        wasStoreHiddenOrBlurred = false;
         incrementVisitorsByFive(true);
       }
     });
