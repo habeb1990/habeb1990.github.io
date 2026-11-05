@@ -2502,7 +2502,27 @@
           }
         }
       }
-      PRODUCTS = PRODUCTS.map(p => sanitizeProductImages(p));
+      // Auto-heal any broken raw.githubusercontent / 404 image links saved in browser localStorage from previous tests
+      const healedFlag = localStorage.getItem('habib_img_heal_v9');
+      PRODUCTS = PRODUCTS.map(p => {
+        const defP = getDefaultProductById(p.id);
+        const fb = defP ? defP.image : getFallbackImageForProduct(p);
+        if (!healedFlag) {
+          // Clean out any broken external upload links that failed to render on the user's laptop
+          if (typeof p.image === 'string' && (p.image.includes('raw.githubusercontent.com') || p.image.includes('/uploads/') || p.image.includes('cdn.jsdelivr.net'))) {
+            p.image = fb;
+          }
+          if (Array.isArray(p.montageImages)) {
+            const validMontage = p.montageImages.filter(m => typeof m === 'string' && !m.includes('raw.githubusercontent.com') && !m.includes('/uploads/') && !m.includes('cdn.jsdelivr.net'));
+            p.montageImages = validMontage.length > 0 ? validMontage : (defP ? [...defP.montageImages] : [fb]);
+          }
+        }
+        return sanitizeProductImages(p);
+      });
+      if (!healedFlag) {
+        localStorage.setItem('habib_img_heal_v9', '1');
+        localStorage.setItem('habib_custom_products', JSON.stringify(PRODUCTS));
+      }
     } catch(e) {}
 
     let currentCategory = 'all';
@@ -2975,7 +2995,24 @@
       if (!t || t === 'null' || t === 'undefined' || t === '[object Object]') return true;
       if (t.startsWith('blob:')) return true;
       if (t.startsWith('data:image/') && t.length < 60) return true;
+      // Convert raw.githubusercontent URLs that fail in Syria or return 404
       return false;
+    }
+
+    function normalizeGitHubImageUrl(url) {
+      if (!url || typeof url !== 'string') return url;
+      const t = url.trim();
+      // If it is a raw.githubusercontent.com URL for this repo, convert to relative path on GitHub Pages or jsDelivr CDN
+      const rawMatch = t.match(/^https?:\/\/raw\.githubusercontent\.com\/([^\/]+\/[^\/]+)\/(?:main|master)\/(.+)$/i);
+      if (rawMatch) {
+        const repoName = rawMatch[1];
+        const filePath = rawMatch[2].split('?')[0];
+        if (location.hostname.endsWith('github.io')) {
+          return `./${filePath}`;
+        }
+        return `https://cdn.jsdelivr.net/gh/${repoName}@main/${filePath}`;
+      }
+      return t;
     }
 
     function getFallbackImageForProduct(p) {
@@ -2985,18 +3022,24 @@
       return ASSETS.dell_xps || ASSETS.laptop;
     }
 
+    function getDefaultProductById(id) {
+      return DEFAULT_PRODUCTS.find(d => d.id === id) || null;
+    }
+
     function sanitizeProductImages(p) {
-      const fb = getFallbackImageForProduct(p);
+      const defP = getDefaultProductById(p.id);
+      const fb = defP ? defP.image : getFallbackImageForProduct(p);
       if (isBrokenImageUrl(p.image)) {
         p.image = fb;
       } else {
-        p.image = hydrateImageRef(p.image);
+        p.image = normalizeGitHubImageUrl(hydrateImageRef(p.image));
       }
+      // If p.image was pointing to a non-existent ./uploads/ or cdn.jsdelivr file from an unauthenticated upload, keep a fallback ready
       if (!Array.isArray(p.montageImages) || p.montageImages.length === 0) {
-        p.montageImages = [p.image];
+        p.montageImages = defP && Array.isArray(defP.montageImages) ? [...defP.montageImages] : [p.image];
       } else {
         p.montageImages = p.montageImages
-          .map(m => hydrateImageRef(m))
+          .map(m => normalizeGitHubImageUrl(hydrateImageRef(m)))
           .filter(m => !isBrokenImageUrl(m));
         if (p.montageImages.length === 0) {
           p.montageImages = [p.image];
@@ -3010,13 +3053,29 @@
 
     function handleImageRenderError(imgEl, prodId, imgIdx) {
       if (!imgEl) return;
-      // Avoid infinite error loop
       if (imgEl.dataset.fallbackApplied === '1') return;
       imgEl.dataset.fallbackApplied = '1';
-      let fb = ASSETS.laptop;
+      const failedSrc = imgEl.getAttribute('src') || '';
+      let fb = ASSETS.dell_xps || ASSETS.laptop;
       if (prodId) {
         const p = PRODUCTS.find(item => item.id === prodId);
-        if (p) fb = getFallbackImageForProduct(p);
+        const defP = getDefaultProductById(prodId);
+        if (p) {
+          fb = defP ? defP.image : getFallbackImageForProduct(p);
+          // Permanently clean the broken URL out of p.montageImages and p.image so it never shows a broken icon again
+          if (Array.isArray(p.montageImages) && p.montageImages.length > 0) {
+            const cleaned = p.montageImages.filter((u, idx) => idx !== imgIdx && u !== failedSrc);
+            p.montageImages = cleaned.length > 0 ? cleaned : (defP ? [...defP.montageImages] : [fb]);
+          } else {
+            p.montageImages = defP ? [...defP.montageImages] : [fb];
+          }
+          if (!p.image || p.image === failedSrc || imgIdx === 0) {
+            p.image = p.montageImages[0] || fb;
+          }
+          try {
+            localStorage.setItem('habib_custom_products', JSON.stringify(PRODUCTS));
+          } catch (e) {}
+        }
       }
       imgEl.src = fb;
     }
@@ -3085,42 +3144,24 @@
       const fileName = `img_${Date.now()}_${Math.floor(Math.random() * 1000)}_${cleanBaseName}.jpg`;
       const repoPath = `uploads/${fileName}`;
 
-      // If GitHub Token & Repo are configured, upload the binary JPEG directly to the website repository on GitHub and return its universal https:// web URL!
+      // If GitHub Token & Repo are configured, upload the binary JPEG to uploads/ in the background, AND return the self-contained DataURL so the image displays 100% immediately on all browsers without waiting for GitHub Pages build or raw.githubusercontent.com!
       if (githubToken && githubRepo) {
-        try {
-          const base64Content = optimizedDataUrl.split(',')[1] || "";
-          if (base64Content) {
-            const apiUrl = `https://api.github.com/repos/${githubRepo}/contents/${repoPath}`;
-            const putRes = await fetch(apiUrl, {
-              method: 'PUT',
-              headers: {
-                'Authorization': `Bearer ${githubToken}`,
-                'Accept': 'application/vnd.github+json',
-                'Content-Type': 'application/json'
-              },
-              body: JSON.stringify({
-                message: `رفع صورة منتج للموقع: ${fileName}`,
-                content: base64Content
-              })
-            });
-            if (putRes.ok) {
-              // Use the relative GitHub Pages path or verified DataURL so it displays 100% immediately even before raw CDN propagation
-              const webUrl = `https://raw.githubusercontent.com/${githubRepo}/main/${repoPath}`;
-              // Preload check: if raw.githubusercontent is accessible and ready, return webUrl; otherwise return optimizedDataUrl which works everywhere immediately
-              try {
-                const checkImg = await new Promise((res) => {
-                  const testImg = new Image();
-                  const timer = setTimeout(() => res(false), 2500);
-                  testImg.onload = () => { clearTimeout(timer); res(true); };
-                  testImg.onerror = () => { clearTimeout(timer); res(false); };
-                  testImg.src = webUrl + "?t=" + Date.now();
-                });
-                if (checkImg) return webUrl;
-              } catch (e) {}
-              return optimizedDataUrl;
-            }
-          }
-        } catch (err) {}
+        const base64Content = optimizedDataUrl.split(',')[1] || "";
+        if (base64Content) {
+          const apiUrl = `https://api.github.com/repos/${githubRepo}/contents/${repoPath}`;
+          fetch(apiUrl, {
+            method: 'PUT',
+            headers: {
+              'Authorization': `Bearer ${githubToken}`,
+              'Accept': 'application/vnd.github+json',
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              message: `رفع صورة منتج للموقع: ${fileName}`,
+              content: base64Content
+            })
+          }).catch(() => {});
+        }
       }
 
       // Queue for automatic GitHub upload as soon as GitHub Token is active, and return universal web data URL for immediate display
@@ -3791,7 +3832,7 @@
       // Build Slides
       track.innerHTML = sliderProducts.map((p, idx) => `
         <div onclick="openModal(${p.id})" class="hero-slide absolute inset-0 transition-opacity duration-1000 ${idx === 0 ? 'opacity-100' : 'opacity-0'} flex items-center justify-center cursor-pointer group/slide" title="اضغط لمعاينة وتفاصيل ${p.title}">
-          <img src="${p.image || ASSETS.laptop}" alt="${p.title}" class="w-full h-full object-cover group-hover/slide:scale-105 transition-transform duration-700">
+          <img src="${p.image || ASSETS.laptop}" onerror="handleImageRenderError(this, ${p.id}, 0)" alt="${p.title}" class="w-full h-full object-cover group-hover/slide:scale-105 transition-transform duration-700">
           <div class="absolute inset-0 bg-gradient-to-t from-[#080c14] via-[#080c14]/50 to-black/30"></div>
           
           <div class="absolute inset-0 flex flex-col justify-end p-6 sm:p-10 text-right space-y-2.5 max-w-3xl">
@@ -5020,7 +5061,19 @@
       const payload = (data.record && typeof data.record === 'object') ? data.record : data;
       let changed = false;
       if (Array.isArray(payload.products) && payload.products.length > 0) {
-        PRODUCTS = hydrateProductsFromDelta(payload.products);
+        const hydrated = hydrateProductsFromDelta(payload.products).map(p => {
+          const defP = getDefaultProductById(p.id);
+          const fb = defP ? defP.image : getFallbackImageForProduct(p);
+          if (typeof p.image === 'string' && (p.image.includes('raw.githubusercontent.com') || p.image.includes('/uploads/') || p.image.includes('cdn.jsdelivr.net'))) {
+            p.image = fb;
+          }
+          if (Array.isArray(p.montageImages)) {
+            const validM = p.montageImages.filter(m => typeof m === 'string' && !m.includes('raw.githubusercontent.com') && !m.includes('/uploads/') && !m.includes('cdn.jsdelivr.net'));
+            p.montageImages = validM.length > 0 ? validM : (defP ? [...defP.montageImages] : [p.image]);
+          }
+          return sanitizeProductImages(p);
+        });
+        PRODUCTS = hydrated;
         try { localStorage.setItem('habib_custom_products', JSON.stringify(PRODUCTS)); } catch(e) {}
         renderHeroSlider();
         renderProducts();
@@ -5085,31 +5138,8 @@
     }
 
     async function flushPendingDeviceImagesToGitHub() {
-      if (!githubToken || !githubRepo) return;
-      for (let i = 0; i < PRODUCTS.length; i++) {
-        const p = PRODUCTS[i];
-        if (p.image && p.image.startsWith("data:image/jpeg;base64,")) {
-          const b64 = p.image.split(",")[1] || "";
-          const fName = `img_${p.id || Date.now()}_main.jpg`;
-          const rPath = `uploads/${fName}`;
-          const ok = await pushBase64FileToGitHubRepo(rPath, b64, `رفع صورة منتج: ${fName}`);
-          if (ok) p.image = `https://raw.githubusercontent.com/${githubRepo}/main/${rPath}`;
-        }
-        if (Array.isArray(p.montageImages)) {
-          for (let j = 0; j < p.montageImages.length; j++) {
-            const mImg = p.montageImages[j];
-            if (mImg && mImg.startsWith("data:image/jpeg;base64,")) {
-              const b64 = mImg.split(",")[1] || "";
-              const fName = `img_${p.id || Date.now()}_${j}.jpg`;
-              const rPath = `uploads/${fName}`;
-              const ok = await pushBase64FileToGitHubRepo(rPath, b64, `رفع صورة مونتاج: ${fName}`);
-              if (ok) p.montageImages[j] = `https://raw.githubusercontent.com/${githubRepo}/main/${rPath}`;
-            }
-          }
-        }
-      }
+      // Keep embedded compressed JPEG DataURLs intact inside store_data.json & habib_updates.html so images open 100% instantly on every browser in Syria without relying on blocked raw.githubusercontent.com URLs
       try {
-        localStorage.setItem("habib_custom_products", JSON.stringify(PRODUCTS));
         localStorage.removeItem("habib_pending_image_uploads");
       } catch (e) {}
     }
@@ -5241,20 +5271,32 @@
         } catch (err) {}
       }
 
-      // 2. Automatically read lightweight store_data.json OR habib_updates.html from GitHub repository for all visitors
-      if (githubRepo) {
+      // 2. Automatically read lightweight store_data.json OR habib_updates.html (same-origin first for 100% reliability in Syria, then CDN fallback)
+      const jsonCandidates = [
+        `./store_data.json?t=${Date.now()}`,
+        `https://cdn.jsdelivr.net/gh/${githubRepo}@main/store_data.json?t=${Date.now()}`,
+        `https://raw.githubusercontent.com/${githubRepo}/main/store_data.json?t=${Date.now()}`
+      ];
+      for (const candidateUrl of jsonCandidates) {
+        if (!candidateUrl.startsWith('./') && !githubRepo) continue;
         try {
-          const rawJsonUrl = `https://raw.githubusercontent.com/${githubRepo}/main/store_data.json?t=${Date.now()}`;
-          const res = await fetch(rawJsonUrl);
+          const res = await fetch(candidateUrl);
           if (res.ok) {
             const data = await res.json();
             if (applyCloudPayload(data, isManual)) return;
           }
         } catch (err) {}
+      }
 
+      const patchCandidates = [
+        `./habib_updates.html?t=${Date.now()}`,
+        `https://cdn.jsdelivr.net/gh/${githubRepo}@main/habib_updates.html?t=${Date.now()}`,
+        `https://raw.githubusercontent.com/${githubRepo}/main/habib_updates.html?t=${Date.now()}`
+      ];
+      for (const patchUrl of patchCandidates) {
+        if (!patchUrl.startsWith('./') && !githubRepo) continue;
         try {
-          const rawHtmlPatchUrl = `https://raw.githubusercontent.com/${githubRepo}/main/habib_updates.html?t=${Date.now()}`;
-          const resPatch = await fetch(rawHtmlPatchUrl);
+          const resPatch = await fetch(patchUrl);
           if (resPatch.ok) {
             const patchHtml = await resPatch.text();
             const parser = new DOMParser();
@@ -5262,7 +5304,7 @@
             const emb = doc.getElementById('embeddedStoreState');
             if (emb && emb.textContent && emb.textContent.trim().length > 2) {
               const data = JSON.parse(emb.textContent);
-              applyCloudPayload(data, isManual);
+              if (applyCloudPayload(data, isManual)) return;
             }
           }
         } catch (err) {}
